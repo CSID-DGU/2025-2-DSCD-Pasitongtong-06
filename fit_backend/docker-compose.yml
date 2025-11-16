@@ -1,0 +1,8 @@
+# docker-compose.yml
+services:
+  bodyshape-api:
+    build: .
+    container_name: bodyshape-api
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
