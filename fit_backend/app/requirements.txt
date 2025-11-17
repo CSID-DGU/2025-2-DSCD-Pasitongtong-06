@@ -1,0 +1,12 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.0
+python-multipart==0.0.9
+opencv-python==4.11.0.86
+mediapipe==0.10.14
+numpy==1.26.4
+
+torch
+torchvision
+timm
+ultralytics
+Pillow
