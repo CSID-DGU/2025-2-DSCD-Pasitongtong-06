@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- 인터넷 연결 권한 (Supabase, Kakao 등 네트워크 통신에 필수) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+     Android 13 (API 33) 이상에서는 이 권한들이 필요 없으며, READ_MEDIA_IMAGES 등으로 대체됩니다.
+     maxSdkVersion="32"는 Android 12L (API 32) 이하 버전에서만 이 권한을 요청하겠다는 의미입니다.
+     -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+
+    <application
+        android:name=".GlobalApplication"
+        android:allowBackup="true"
+        android:windowSoftInputMode="adjustResize|stateVisible"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.FitForU"
+        tools:targetApi="31">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.FitForU">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.pasitongtong.fitforu" android:host="main" />
+            </intent-filter>
+        </activity>
+
+        <!-- 카카오 로그인 관련 설정 -->
+        <activity
+            android:name="com.kakao.sdk.auth.AuthCodeHandlerActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!--
+                 Redirect URI: "kakao{NATIVE_APP_KEY}://oauth"
+                 중괄호 {}를 제거한 네이티브 앱 키를 사용합니다.
+                -->
+                <data
+                    android:scheme="kakao07d770992a4f1828d5d4b0d8a95f0369"
+                    android:host="oauth"/>
+            </intent-filter>
+        </activity>
+
+        <!-- 카카오 네이티브 앱 키 (meta-data) -->
+        <meta-data
+            android:name="com.kakao.sdk.AppKey"
+            android:value="07d770992a4f1828d5d4b0d8a95f0369" />
+    </application>
+
+</manifest>
