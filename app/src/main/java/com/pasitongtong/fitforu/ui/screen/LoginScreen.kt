@@ -5,6 +5,7 @@ import android.content.Intent
 import android.util.Log
 import androidx.compose.runtime.*
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
@@ -12,8 +13,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.kakao.sdk.auth.model.OAuthToken
@@ -24,7 +27,6 @@ import com.pasitongtong.fitforu.viewmodel.AuthUiState
 import com.pasitongtong.fitforu.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 import com.pasitongtong.fitforu.R
-
 
 @Composable
 fun LoginScreen(
@@ -55,47 +57,95 @@ fun LoginScreen(
 
     // ===== UI =====
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White), // 필요하면 MaterialTheme.colorScheme.background 로 변경
         contentAlignment = Alignment.Center
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 32.dp),
-            verticalArrangement = Arrangement.Center,
+                .padding(horizontal = 32.dp, vertical = 32.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("FitForU", style = MaterialTheme.typography.displaySmall)
+            // ───── 상단 앱 이름 ─────
+            Text(
+                text = "FitForU",
+                style = MaterialTheme.typography.titleLarge
+            )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            // ───── 가운데 일러스트 + 문구 ─────
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.loginscreen),
+                    contentDescription = "FitForU illustration",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(260.dp)
+                )
 
-            when (val state = authState) {
-                AuthUiState.Idle -> {
-                    Text("카카오 로그인을 해주세요.")
-                }
-                is AuthUiState.Authed -> {
-                    val email = state.email ?: "사용자"
-                    Text("안녕하세요, $email 님!")
-                }
-                is AuthUiState.Error -> {
-                    Text(
-                        text = "오류: ${state.message}",
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-                AuthUiState.Loading -> {
-                    Text("로그인 중입니다...")
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "사진 한 장으로 체형 파악,\n옷장 속 아이템으로 코디 완성!",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "나만의 퍼스널 스타일링을 경험해보세요.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 상태 메시지는 그림 아래에 작게 표시
+                when (val state = authState) {
+                    AuthUiState.Idle -> {
+
+                    }
+                    is AuthUiState.Authed -> {
+                        val email = state.email ?: "사용자"
+                        Text(
+                            text = "안녕하세요, $email 님!",
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    is AuthUiState.Error -> {
+                        Text(
+                            text = "오류: ${state.message}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    AuthUiState.Loading -> {
+                        Text(
+                            text = "로그인 중입니다...",
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(80.dp))
-
-            // 카카오 로그인 버튼
+            // ───── 하단 카카오 로그인 버튼 ─────
             Image(
                 painter = painterResource(id = R.drawable.kakao_login_large_wide),
                 contentDescription = "카카오 로그인",
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(52.dp)
                     .clickable(enabled = !isLoading) {
                         if (UserApiClient.instance.isKakaoTalkLoginAvailable(context)) {
                             UserApiClient.instance.loginWithKakaoTalk(context) { token, error ->

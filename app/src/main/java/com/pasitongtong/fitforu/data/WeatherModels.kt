@@ -3,11 +3,12 @@ package com.pasitongtong.fitforu.data
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// ---------- OpenWeather 응답용 모델 ----------
 
 @Serializable
 data class WeatherMain(
-    @SerialName("temp") val temp: Double    // 현재 기온 (섭씨로 요청할 것)
+    @SerialName("temp_max") val tempMax: Double,
+    @SerialName("temp_min") val tempMin: Double,
+    @SerialName("temp") val temp: Double
 )
 
 @Serializable
@@ -18,14 +19,30 @@ data class WeatherDescription(
 @Serializable
 data class WeatherResponse(
     val weather: List<WeatherDescription>,
-    val main: WeatherMain,
-    val name: String? = null               // 도시 이름 (사용 안 하면 써도 되고 안 써도 됨)
+    val main: WeatherMain
 )
+
 
 // ---------- UI 에서 쓸 상태 모델 ----------
 
+// 홈 화면에서 사용할 상태
+// WeatherModels.kt (또는 HomeUiState 선언된 파일)
+
 data class HomeUiState(
-    val temperature: String = "",          // "23°C" 이런 형태의 문자열
-    val weatherText: String = "",          // "맑음" 등 설명
-    val loading: Boolean = true            // 로딩 중 여부
+    val loading: Boolean = false,
+
+    // 예전 값들
+    val weatherText: String = "",
+    val temperature: String = "",
+
+    // 새 디자인용 값들
+    val dateText: String = "",   // 예: "11월 25일 (화)"
+    val maxTemp: String = "",    // 예: "15℃"
+    val minTemp: String = "",    // 예: "7℃"
+    val diffText: String = "",   // 예: "어제보다 5℃ 높아요"
+
+    // 🔥 여기! 날씨 아이콘을 이모지(String)로 저장
+    val weatherIcon: String = "🌥️"
 )
+
+
