@@ -1,9 +1,12 @@
+# recommendation_pipeline.py
 import json
 import math
 import requests
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Set
 import pandas as pd
+from openai import OpenAI  # 🔹 OpenAI 추가
+import os
 
 # ============================================================
 # 설정 및 상수
@@ -16,8 +19,15 @@ XLSX_SCORING_PATH = DATA_DIR / "캡디_스코어링.xlsx"
 OUTER2TOP_PATH = DATA_DIR / "outer2top_map.json"
 TOP2BOTTOM_PATH = DATA_DIR / "top2bottom_map.json"
 
-# 날씨 API 키 (환경 변수로 빼는 것이 좋음)
-OPENWEATHER_API_KEY = "de27abae3b89192f4c8dd53b91402717"
+# 날씨 API 키
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+
+# 🔹 OpenAI API 설정 (노트북 키 사용, 실제 배포시 환경변수 사용 권장)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    print("[WARN] OPENAI_API_KEY가 설정되지 않았습니다.")
+
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # 가중치
 W1_BASE = 0.7
@@ -257,6 +267,108 @@ def get_candidates(color: str, map_data: Dict) -> List[str]:
     return [list(r.values())[0] for r in rows] 
 
 # ============================================================
+# 🔹 LLM Prompt & Generation (새로 추가됨)
+# ============================================================
+
+def build_outfit_prompt(user_shape: str,
+                        outer: Optional[Dict[str, Any]],
+                        top: Optional[Dict[str, Any]],
+                        bottom: Optional[Dict[str, Any]]) -> str:
+    """outfit dict에서 코디 설명용 프롬프트 생성 (원피스 미고려)"""
+
+    def _fmt_item(item: Optional[Dict[str, Any]]) -> Dict[str, str]:
+        if not item:
+            return {
+                "minor": "없음", "sleeve": "없음", "length": "없음",
+                "color": "없음", "prints": "없음", "neckline": "없음", "fit": "없음",
+            }
+        prints = item.get("prints") or []
+        prints_str = ", ".join(map(str, prints)) if prints else "민무늬"
+        return {
+            "minor": item.get("minor", "없음"),
+            "sleeve": item.get("sleeve", "없음"),
+            "length": item.get("length", "없음"),
+            "color": item.get("color", "없음"),
+            "prints": prints_str,
+            "neckline": item.get("neckline", "없음"),
+            "fit": item.get("fit", "없음"),
+        }
+
+    o = _fmt_item(outer)
+    t = _fmt_item(top)
+    b = _fmt_item(bottom)
+
+    prompt = f"""
+너는 전문 패션 스타일리스트다.
+아래 사용자의 체형과 옷의 속성을 바탕으로, 2~4줄 이내의 간결한 코디 설명을 작성하라.
+
+[작성 규칙]
+1) 첫 문장은 “사용자님은 ‘{user_shape}형’ 입니다.”로 시작한다.
+2) 체형 일반 설명을 하지 말고, **현재 상의·하의·아우터 조합이 해당 체형을 어떻게 보완하거나 강조하는지 직접적으로 묘사한다.**
+   - 예: “허리선을 더 날씬하게 보이게 한다”, “어깨 비율을 안정감 있게 만든다”, “하체 라인이 길어 보인다” 등.
+3) 색상 대비, 소매/기장/핏 조합이 체형 연출에 미치는 시각적 효과를 1회 이상 자연스럽게 포함한다.
+4) 마지막 문장은 “Tip:”으로 시작하며, 체형 보완에 도움이 되는 실용적인 착장 팁을 한 줄로 제시한다.
+5) 체형 정의 설명, 불필요한 형용사, 과도한 미사여구는 금지하며, 옷 조합이 체형에 미치는 영향만 명확히 설명한다.
+
+[입력 정보]
+체형: {user_shape}
+
+아우터:
+- 중분류: {o["minor"]}
+- 소매기장: {o["sleeve"]}
+- 기장: {o["length"]}
+- 색상: {o["color"]}
+- 프린트: {o["prints"]}
+- 넥라인: {o["neckline"]}
+- 핏: {o["fit"]}
+
+상의:
+- 중분류: {t["minor"]}
+- 소매기장: {t["sleeve"]}
+- 기장: {t["length"]}
+- 색상: {t["color"]}
+- 프린트: {t["prints"]}
+- 넥라인: {t["neckline"]}
+- 핏: {t["fit"]}
+
+하의:
+- 중분류: {b["minor"]}
+- 기장: {b["length"]}
+- 색상: {b["color"]}
+- 프린트: 없음
+- 넥라인: 없음
+- 핏: {b["fit"]}
+"""
+    return prompt.strip()
+
+def generate_outfit_comment(user_shape: str,
+                            outer: Optional[Dict[str, Any]],
+                            top: Optional[Dict[str, Any]],
+                            bottom: Optional[Dict[str, Any]]) -> str:
+    """OpenAI API로 코디 설명 생성"""
+    if not OPENAI_API_KEY:
+        return "API 키 설정이 필요합니다."
+
+    user_prompt = build_outfit_prompt(user_shape, outer, top, bottom)
+
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-4o-mini", # 또는 gpt-3.5-turbo / gpt-4
+            messages=[
+                {
+                    "role": "system",
+                    "content": "너는 사용자의 체형과 오늘의 코디를 설명해주는 전문 패션 스타일리스트다."
+                },
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.7,
+            max_tokens=300,
+        )
+        return completion.choices[0].message.content.strip()
+    except Exception as e:
+        return f"코디 설명 생성 실패: {str(e)}"
+
+# ============================================================
 # Recommendation Generator
 # ============================================================
 
@@ -293,15 +405,13 @@ def recommend_outfits(
 
     # Strategy A: Top Anchor (No Outer) -> Summer or warm Spring/Fall
     if anchor_season == "summer" or (anchor_season in ["spring_fall", "late_fall_early_winter"] and not outers):
-        # Force no outer logic
-        force_no_short = (anchor_season != "summer") # 여름 아니면 반팔 단독 불가 등 로직 필요 시 사용
+        force_no_short = (anchor_season != "summer") 
         
         for top in tops:
             if force_no_short and top.get("sleeve") == "반팔": continue
             t_color = top.get("color")
             if not t_color: continue
             
-            # Color Filter
             valid_bottom_colors = get_candidates(t_color, top2bottom_map)
             candidate_bottoms = [b for b in bottoms if b.get("color") in valid_bottom_colors]
             
@@ -311,7 +421,6 @@ def recommend_outfits(
 
     # Strategy B: Outer Anchor -> Winter or Cool seasons
     else:
-        # 기본적으로 아우터가 있는 조합 생성
         for outer in outers:
             o_color = outer.get("color")
             if not o_color: continue
@@ -329,12 +438,21 @@ def recommend_outfits(
                 for bot in candidate_bottoms:
                     score = compute_outfit_score(top, bot, outer, user_shape, shape_weight_table)
                     outfits.append(make_outfit(outer, top, bot, score))
-                    
-        # (Optional) 간절기에는 아우터 없는 조합도 섞을 수 있음 -> 여기서는 생략하거나 필요시 추가
 
     # 4. Sort and Return
     outfits.sort(key=lambda x: x["score"], reverse=True)
     final_results = outfits[:top_k]
+    
+    # 🔹 Top-3 (or less) 에 대해 코디 설명 생성
+    for i in range(min(len(final_results), 3)):
+        item = final_results[i]
+        comment = generate_outfit_comment(
+            user_shape=user_shape,
+            outer=item["outer"],
+            top=item["top"],
+            bottom=item["bottom"]
+        )
+        item["comment"] = comment
     
     return {
         "date": str(pd.Timestamp.now().date()),

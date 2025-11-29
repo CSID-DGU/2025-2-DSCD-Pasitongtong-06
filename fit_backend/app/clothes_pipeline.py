@@ -1,5 +1,6 @@
 # clothes_pipeline.py
 import os
+import io
 from pathlib import Path
 
 import torch
@@ -9,6 +10,7 @@ import timm
 from torchvision import transforms
 from PIL import Image
 from ultralytics import YOLO
+from rembg import remove as rembg_remove  # 🔹 배경 제거 라이브러리 추가
 
 # ================================
 # 1) 경로/환경 설정
@@ -246,13 +248,35 @@ def postprocess_by_minor(res: dict) -> dict:
 
 
 # ================================
-# 6) 전체 파이프라인: YOLO → crop → attr
+# 6) 배경 제거 함수 (rembg)
+# ================================
+def remove_background_with_rembg(pil_img: Image.Image, save_path: str):
+    """
+    rembg(U^2-Net 기반)로 배경 제거 후 RGBA PNG 저장
+    """
+    try:
+        out = rembg_remove(pil_img.convert("RGBA"))
+        # rembg 버전에 따라 bytes 또는 PIL.Image가 리턴될 수 있음
+        if isinstance(out, bytes):
+            out = Image.open(io.BytesIO(out)).convert("RGBA")
+        else:
+            out = out.convert("RGBA")
+        out.save(save_path)
+    except Exception as e:
+        print(f"[Warn] rembg 배경제거 실패, 원본 저장: {save_path} / {e}")
+        pil_img.convert("RGBA").save(save_path)
+
+
+# ================================
+# 7) 전체 파이프라인: YOLO → crop → rembg → attr
 # ================================
 def process_image(image_path: str,
                   save_crops_dir: str | os.PathLike | None = None):
     """
     하나의 전체 코디 이미지에서 의류 bbox들을 찾아서,
-    각 bbox에 대해 속성 분류 결과 리스트를 반환
+    각 bbox에 대해 속성 분류 결과 리스트를 반환.
+    - crops/original: 원본 크롭 (속성 분석용)
+    - crops/nobg: 배경 제거 크롭 (프론트엔드 표시용)
     """
     image_path = str(image_path)
     if not os.path.exists(image_path):
@@ -261,7 +285,11 @@ def process_image(image_path: str,
     if save_crops_dir is None:
         save_crops_dir = BASE_DIR / "crops"
 
-    os.makedirs(save_crops_dir, exist_ok=True)
+    # 폴더 구조 생성
+    orig_dir = os.path.join(save_crops_dir, "original")
+    nobg_dir = os.path.join(save_crops_dir, "nobg")
+    os.makedirs(orig_dir, exist_ok=True)
+    os.makedirs(nobg_dir, exist_ok=True)
 
     # YOLO 추론
     results = yolo_model(
@@ -297,13 +325,23 @@ def process_image(image_path: str,
             continue
 
         crop = img.crop((x1, y1, x2, y2))
-        crop_path = os.path.join(str(save_crops_dir), f"crop_{base}_{i}.jpg")
+        
+        # 1) 원본 저장 (JPG)
+        crop_filename = f"crop_{base}_{i}.jpg"
+        crop_path = os.path.join(orig_dir, crop_filename)
         crop.save(crop_path)
 
+        # 2) 배경제거 저장 (PNG)
+        nobg_filename = f"crop_{base}_{i}.png"
+        crop_nobg_path = os.path.join(nobg_dir, nobg_filename)
+        remove_background_with_rembg(crop, crop_nobg_path)
+
+        # 3) 속성 추론 (원본 crop 사용)
         res = run_attr_inference(crop_path)
         res = postprocess_by_minor(res)
 
         res["crop_path"] = crop_path
+        res["crop_nobg_path"] = crop_nobg_path
         res["bbox"] = [x1, y1, x2, y2]
         res["score"] = float(score)
 
