@@ -1,36 +1,35 @@
 package com.pasitongtong.fitforu.ui.screen
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.BookmarkBorder
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.pasitongtong.fitforu.model.SavedOutfit
 import com.pasitongtong.fitforu.R
-
+import com.pasitongtong.fitforu.model.SavedOutfit
 
 @Composable
 fun OutfitDetailScreen(
     navController: NavController,
     onSaveOutfit: (SavedOutfit) -> Unit = {}
 ) {
+    // 샘플 코디 리스트
     val outfitList = listOf(
         SavedOutfit(
             imageRes = R.drawable.top1,
@@ -53,7 +52,7 @@ fun OutfitDetailScreen(
     )
 
     var selectedIndex by remember { mutableStateOf(0) }
-    var isBookmarked by remember { mutableStateOf(false) }
+    var isSelected by remember { mutableStateOf(false) } // 체크 아이콘 상태
     val currentOutfit = outfitList[selectedIndex]
 
     Scaffold(
@@ -61,7 +60,7 @@ fun OutfitDetailScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -73,30 +72,9 @@ fun OutfitDetailScreen(
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "Best Clothes",
-                    style = MaterialTheme.typography.headlineMedium,
+                    text = "FitForU",
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // 🔥 책갈피 아이콘 (저장 버튼)
-                Icon(
-                    imageVector = if (isBookmarked)
-                        Icons.Filled.Bookmark
-                    else
-                        Icons.Filled.BookmarkBorder,
-                    contentDescription = "저장",
-                    tint = if (isBookmarked)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.outline,
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clickable {
-                            isBookmarked = !isBookmarked
-                            if (isBookmarked) onSaveOutfit(currentOutfit)
-                        }
                 )
             }
         }
@@ -108,70 +86,163 @@ fun OutfitDetailScreen(
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // 상단 질문 텍스트
             Text(
-                text = currentOutfit.title,
+                text = "핏포유 코디는 어떠요? ✨",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Image(
-                painter = painterResource(id = currentOutfit.imageRes),
-                contentDescription = null,
+            // ----- 메인 코디 이미지 + 오른쪽 버튼 컬럼 -----
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(380.dp)
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                    .height(380.dp),
+                contentAlignment = Alignment.Center
             ) {
-                itemsIndexed(outfitList) { index, item ->
-                    Image(
-                        painter = painterResource(id = item.imageRes),
-                        contentDescription = "썸네일",
+                // 👕 이미지: 잘리지 않게 ContentScale.Fit 사용
+                Image(
+                    painter = painterResource(id = currentOutfit.imageRes),
+                    contentDescription = "코디 이미지",
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)      // 살짝 여백 생기게
+                        .height(320.dp),          // 너무 크지 않게 고정
+                    contentScale = ContentScale.Fit
+                )
+
+                // 오른쪽에 세로 정렬된 화살표 / 체크 버튼
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 20.dp)
+                        .offset(y = 40.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // ➡ 다음 코디 버튼
+                    Surface(
                         modifier = Modifier
-                            .size(92.dp)
-                            .padding(4.dp)
-                            .clickable { selectedIndex = index }
-                            .border(
-                                width = if (selectedIndex == index) 3.dp else 1.dp,
-                                color = if (selectedIndex == index)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.outlineVariant,
-                                shape = MaterialTheme.shapes.medium
+                            .size(54.dp)
+                            .clickable {
+                                // 다음 코디로 이동
+                                selectedIndex = (selectedIndex + 1) % outfitList.size
+                                isSelected = false    // 새 코디에는 체크 초기화
+                            },
+                        shape = CircleShape,
+                        color = Color(0xFFE6ECFF)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "다음 코디",
+                                tint = Color(0xFF2F3A5A)
                             )
-                    )
+                        }
+                    }
+
+                    // ✓ 선택(저장) 버튼
+                    Surface(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clickable {
+                                isSelected = !isSelected
+                                if (isSelected) {
+                                    onSaveOutfit(currentOutfit)
+                                }
+                            },
+                        shape = CircleShape,
+                        color = if (isSelected) Color(0xFF4C6FFF) else Color(0xFFE6ECFF)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = "코디 선택",
+                                tint = if (isSelected) Color.White else Color(0xFF4C6FFF)
+                            )
+                        }
+                    }
+                }
+
+                // 하단 페이지 인디케이터 (● ○ ○)
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    repeat(outfitList.size) { index ->
+                        val isCurrent = index == selectedIndex
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 3.dp)
+                                .size(if (isCurrent) 8.dp else 6.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isCurrent)
+                                        Color(0xFF4C6FFF)
+                                    else
+                                        Color(0xFFCDD3E6)
+                                )
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(22.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
+// 💡 코디 선택 방법 (제목)
+// - 왼쪽 정렬
+// - 회색
+// - 글자 크기 작게 (bodySmall)
             Text(
-                text = "사용자님은 내추럴형입니다.",
+                text = "💡 코디 선택 방법",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Start
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+// 설명 문구
+// - '추천 코디~'와 같은 정렬/색/크기
+            Text(
+                text = "추천 코디가 마음에 들면 하단의 ‘체크’, 다른 코디는 ‘다음’ 버튼을 눌러주세요.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Start
+            )
+
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // ----- 체형 문장(가운데 정렬만) -----
+            Text(
+                text = "사용자님은 '모래시계형' 입니다.",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // 설명/Tip : 기본(좌측) 정렬
             Text(
                 text = currentOutfit.bodyText,
-                textAlign = TextAlign.Center
+                style = MaterialTheme.typography.bodyMedium
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
                 text = currentOutfit.tip,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
             )
         }
     }

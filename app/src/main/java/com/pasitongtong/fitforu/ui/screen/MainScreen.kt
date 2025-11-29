@@ -100,7 +100,7 @@ fun MainScreen(mainViewModel: MainViewModel) {
             }
 
             composable(Screen.AnalysisResult.route) {
-                AnalysisResultScreen()
+                AnalysisResultScreen(navController = navController)
             }
 
             composable(Screen.OutfitDetail.route) {
