@@ -129,34 +129,44 @@ class MainViewModel : ViewModel() {
     /** 프로필 최초 생성 (성별 선택 후) */
     fun createProfile(userId: String, gender: String) {
         viewModelScope.launch {
-            runCatching {
+            try {
                 val authUser = client.auth.currentUserOrNull()
                     ?: error("로그인 정보 없음")
 
-                val email = authUser.email
-
-                // 1) public.users upsert
-                client.postgrest["users"].upsert(
-                    mapOf(
-                        "id" to userId,
-                        "email" to email
-                    )
-                )
-
-                // 2) profiles insert (없으면 생성, 있으면 업데이트)
+                // ⚡ profiles 테이블에 내 프로필 upsert (없으면 insert, 있으면 update)
                 client.postgrest["profiles"].upsert(
-                    mapOf(
-                        "user_id" to userId,
-                        "gender" to gender,
+                    Profile(
+                        user_id = userId,
+                        gender = gender,
+                        // height_cm, weight_kg, banned_items 는 지금은 null 로 둔다
+                        height_cm = null,
+                        weight_kg = null,
+                        banned_items = null
                     )
                 )
-            }.onSuccess {
-                loadMyProfile(userId)
-            }.onFailure { e ->
+
+                // 로컬 상태 갱신
+                _profile.value = Profile(
+                    user_id = userId,
+                    gender = gender
+                )
+                _authState.value = AuthUiState.Authed(email = authUser.email)
+            } catch (e: Exception) {
                 Log.e("MainViewModel", "createProfile 실패", e)
-                _authState.value = AuthUiState.Error("PROFILE_CREATE_FAILED")
+
+                // ❗ 임시 방편: DB 에러여도 앱은 진행되게 하기
+                val email = client.auth.currentUserOrNull()?.email
+                _profile.value = Profile(
+                    user_id = userId,
+                    gender = gender
+                )
+                _authState.value = AuthUiState.Authed(email = email)
+
+                // 만약 꼭 에러를 보여주고 싶으면 위 Authed 대신 Error 로 바꾸면 됨
+                // _authState.value = AuthUiState.Error("PROFILE_CREATE_FAILED")
             }
         }
     }
+
 }
 

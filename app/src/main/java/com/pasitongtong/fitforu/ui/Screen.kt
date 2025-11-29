@@ -37,4 +37,11 @@ sealed class Screen(
         route = "saved_outfit_list",
         title = "저장한 코디 보기"
     )
+
+    // Screen.kt 안에
+    object AddClothes : Screen(
+        route = "add_clothes",
+        title = "옷 추가"
+    )
+
 }

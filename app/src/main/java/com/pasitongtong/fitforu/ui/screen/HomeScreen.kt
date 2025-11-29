@@ -3,7 +3,6 @@ package com.pasitongtong.fitforu.ui.screen
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -12,15 +11,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.pasitongtong.fitforu.ui.Screen
 import com.pasitongtong.fitforu.viewmodel.HomeViewModel
-import androidx.compose.ui.res.painterResource
-
-
 
 @Composable
 fun HomeScreen(
@@ -28,6 +25,7 @@ fun HomeScreen(
     viewModel: HomeViewModel
 ) {
     val uiState by viewModel.state.collectAsState()
+    val bodyShapeInfo = viewModel.bodyShapeInfo   // 🔹 HomeViewModel 에 추가한 체형 결과
 
     Column(
         modifier = Modifier
@@ -47,11 +45,10 @@ fun HomeScreen(
 
         // ─── 상단 날씨 카드 ───
         WeatherSummaryCard(
-            // 🔹 아래 4개는 uiState 에서 가져와 써주면 돼
-            dateText = uiState.dateText,                    // 예: "11월 25일 (화)"
-            maxTemp = uiState.maxTemp,                      // 예: "15℃"
-            minTemp = uiState.minTemp,                      // 예: "7℃"
-            diffText = uiState.diffText,                    // 예: "어제보다 5℃ 높아요"
+            dateText = uiState.dateText,
+            maxTemp = uiState.maxTemp,
+            minTemp = uiState.minTemp,
+            diffText = uiState.diffText,
             loading = uiState.loading,
             weatherEmoji = uiState.weatherIcon,
             onRefreshClick = { viewModel.refresh() }
@@ -59,10 +56,14 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // ─── 체형 분석 CTA 카드 ───
-        BodyAnalysisCtaCard(
-            onClick = { navController.navigate(Screen.SkeletalAnalysis.route) }
-        )
+        // ─── 체형 분석 카드 (결과 없으면 CTA, 있으면 결과 카드) ───
+        if (bodyShapeInfo == null) {
+            BodyAnalysisCtaCard(
+                onClick = { navController.navigate(Screen.SkeletalAnalysis.route) }
+            )
+        } else {
+            BodyAnalysisResultCard(info = bodyShapeInfo)
+        }
 
         Spacer(modifier = Modifier.height(20.dp))
 
@@ -94,6 +95,7 @@ fun HomeScreen(
         )
     }
 }
+
 @Composable
 private fun WeatherSummaryCard(
     dateText: String,
@@ -101,7 +103,7 @@ private fun WeatherSummaryCard(
     minTemp: String,
     diffText: String,
     loading: Boolean,
-    weatherEmoji: String,          // ← String 이모지
+    weatherEmoji: String,
     onRefreshClick: () -> Unit
 ) {
     Card(
@@ -122,11 +124,9 @@ private fun WeatherSummaryCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
 
-            // ───── 왼쪽 : 날씨 아이콘 + 텍스트 ─────
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                // 🔥 여기: 이모지 하나만 사용 (weatherIcon 관련 if/else 싹 삭제)
                 Text(
                     text = weatherEmoji,
                     fontSize = 40.sp,
@@ -169,7 +169,6 @@ private fun WeatherSummaryCard(
                 )
             }
 
-            // ───── 오른쪽 : 옷 아이콘 묶음 (그대로) ─────
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -215,7 +214,6 @@ private fun BodyAnalysisCtaCard(onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
 
-            // 🔍 + 텍스트
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -235,19 +233,68 @@ private fun BodyAnalysisCtaCard(onClick: () -> Unit) {
                 }
             }
 
-            // 🟡 🔥 핵심: 화살표를 오른쪽 끝으로 미는 Spacer
             Spacer(modifier = Modifier.weight(1f))
 
-            // ➜ 화살표
             Text(
                 text = "➜",
                 fontSize = 32.sp,
-                modifier = Modifier.padding(end = 2.dp) // 미세 오른쪽 정렬
+                modifier = Modifier.padding(end = 2.dp)
             )
         }
     }
 }
 
+/**
+ * 🔹 체형 분석 결과가 저장된 경우에 보여줄 카드
+ *    (왼쪽에 캐릭터 이미지 + 오른쪽에 텍스트)
+ */
+@Composable
+private fun BodyAnalysisResultCard(info: BodyShapeInfo) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFE7F3FF)
+        ),
+        shape = MaterialTheme.shapes.extraLarge,
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            // 왼쪽 캐릭터/체형 이미지
+            Icon(
+                painter = painterResource(id = info.imageRes),
+                contentDescription = info.label,
+                modifier = Modifier
+                    .size(56.dp),
+                tint = Color.Unspecified        // 원본 색 유지
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "사용자님은 ‘${info.label}’ 입니다.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = info.summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun OutfitResultCard(
@@ -261,7 +308,6 @@ private fun OutfitResultCard(
             .clickable(onClick = onCardClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(
-            // 🔹 연회색
             containerColor = Color(0xFFF1F2F6)
         ),
         shape = MaterialTheme.shapes.large
@@ -281,3 +327,4 @@ private fun OutfitResultCard(
         }
     }
 }
+

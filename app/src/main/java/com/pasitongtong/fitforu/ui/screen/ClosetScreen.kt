@@ -6,49 +6,82 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.BookmarkBorder
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Collections
-import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.pasitongtong.fitforu.viewmodel.MainViewModel
 import com.pasitongtong.fitforu.R
-import androidx.compose.foundation.BorderStroke
+import com.pasitongtong.fitforu.viewmodel.MainViewModel
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Settings
+import com.pasitongtong.fitforu.ui.Screen
+
+
+// 카테고리 정보 (이모지로 아이콘 표현)
+data class ClosetCategory(
+    val id: String,
+    val label: String,
+    val emoji: String
+)
+
+// 실제로 사용할 카테고리들
+private val closetCategories = listOf(
+    ClosetCategory(id = "ALL",    label = "전체",  emoji = "👕"),  // 전체 = 티셔츠 아이콘
+    ClosetCategory(id = "OUTER",  label = "아우터", emoji = "🧥"),
+    ClosetCategory(id = "TOP",    label = "상의",  emoji = "👚"),
+    ClosetCategory(id = "BOTTOM", label = "하의",  emoji = "👖"),
+    ClosetCategory(id = "DRESS",  label = "원피스", emoji = "👗")
+)
+
+// 카테고리 정보(백엔드 연동 시 id 값만 맞춰 쓰면 됨)
+private enum class ClothesCategory(val id: String, val label: String, val emoji: String) {
+    ALL("ALL", "전체", "\uD83D\uDC56"),      // 옷걸이 느낌 이모지
+    OUTER("OUTER", "아우터", "\uD83E\uDDE5"), // 🧥
+    TOP("TOP", "상의", "\uD83D\uDC55"),      // 👕
+    BOTTOM("BOTTOM", "하의", "\uD83D\uDC56"), // 👖
+    DRESS("DRESS", "원피스", "\uD83D\uDC57")  // 👗
+}
 
 @Composable
 fun ClosetScreen(
     navController: NavController,
     viewModel: MainViewModel
 ) {
+    var selectedCategoryId by remember { mutableStateOf("ALL") }   // 기본: 전체
+    val totalCount = 3  // TODO: 나중에 백엔드에서 실제 개수 받아오기
+
     Scaffold(
         topBar = {
             ClosetTopBar(
                 onBackClick = { navController.popBackStack() },
-                onCalendarClick = {
-                    // TODO: 캘린더 화면으로 이동할 때 연결
+                onAddClick = {
+                    // ➕ 눌렀을 때 옷 저장 화면으로 이동
+                    navController.navigate(Screen.AddClothes.route)
                 }
             )
         }
@@ -59,120 +92,91 @@ fun ClosetScreen(
                 .background(MaterialTheme.colorScheme.background)
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState())
         ) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ================= 상단 두 개 카드 =================
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                ClosetHeaderCard(
-                    title = "나의 옷장 만들기",
-                    icon = Icons.Filled.Collections,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        // TODO: 옷장 생성 화면으로 이동
-                    }
-                )
-                ClosetHeaderCard(
-                    title = "내 옷장",
-                    icon = Icons.Filled.Person,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        // TODO: 내 옷장 상세 화면
-                    }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ================= "모든 옷" 섹션 =================
+            // ------- "내 옷" 타이틀 -------
             Text(
-                text = "모든 옷",
-                style = MaterialTheme.typography.titleMedium,
+                text = "내 옷",
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 큰 박스 안에 2x2 정사각형 그리드 ( + 카드 + 샘플 옷 3개 )
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            // ------- 카테고리 아이콘 Row (이모지 사용) -------
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // (+) 카드 – 추후 Supabase 업로드/선택 트리거
-                        AddClothesCard(
-                            onClick = {
-                                // TODO: 갤러리/카메라 or Supabase 업로드 연결
-                            }
-                        )
-
-                        ClosetThumbnailCard(
-                            imageRes = R.drawable.closet1,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        ClosetThumbnailCard(
-                            imageRes = R.drawable.closet2,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        ClosetThumbnailCard(
-                            imageRes = R.drawable.closet3,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                closetCategories.forEach { category ->
+                    ClosetCategoryChip(
+                        category = category,
+                        selected = selectedCategoryId == category.id,
+                        onClick = { selectedCategoryId = category.id }
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ================= 보관함 / 저장한 코디 보기 =================
-            ActionRowCard(
-                title = "보관함",
-                leadingIcon = Icons.Filled.CloudUpload,
-                onClick = {
-                    // TODO: 보관함 화면 이동
-                }
-            )
-
             Spacer(modifier = Modifier.height(8.dp))
 
-            ActionRowCard(
-                title = "저장한 코디 보기",
-                leadingIcon = Icons.Filled.BookmarkBorder,
-                onClick = {
-                    // TODO: 저장된 코디 목록 화면 이동
-                }
-            )
+            // 총 N개 / 정렬순
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "총 ${totalCount}개",
+                    style = MaterialTheme.typography.bodySmall
+                )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "저장한 순",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = "정렬 변경",
+                        modifier = Modifier
+                            .size(18.dp)
+                            .padding(start = 2.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // ------- 옷 리스트 들어가는 회색 영역 (조금 더 크게) -------
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),   // 남은 높이 전부 사용,   // 🔹 회색 박스 더 크게
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFF3F4F7)
+                ),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    ClosetItemCard(imageRes = R.drawable.closet1, modifier = Modifier.weight(1f))
+                    ClosetItemCard(imageRes = R.drawable.closet2, modifier = Modifier.weight(1f))
+                    ClosetItemCard(imageRes = R.drawable.closet3, modifier = Modifier.weight(1f))
+                }
+            }
         }
     }
 }
+
 
 /**
  * 상단 AppBar
@@ -180,7 +184,7 @@ fun ClosetScreen(
 @Composable
 private fun ClosetTopBar(
     onBackClick: () -> Unit,
-    onCalendarClick: () -> Unit
+    onAddClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -197,159 +201,225 @@ private fun ClosetTopBar(
                 )
             }
             Text(
-                text = "Closet",
-                // Skeletal Analysis 와 비슷한 크기로 맞추기
-                style = MaterialTheme.typography.headlineMedium.copy(fontSize = 28.sp),
+                text = "FitForU",
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
         }
-        IconButton(onClick = onCalendarClick) {
+        IconButton(onClick = onAddClick) {
             Icon(
-                imageVector = Icons.Filled.CalendarToday,
-                contentDescription = "캘린더"
+                imageVector = Icons.Filled.Add,
+                contentDescription = "옷 추가하기"
             )
         }
     }
 }
 
 /**
- * 상단의 "나의 옷장 만들기 / 내 옷장" 카드
- * → 테두리 있는 라운드 카드
+ * 카테고리 원형 아이콘 Row
  */
 @Composable
-private fun ClosetHeaderCard(
-    title: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
+private fun CategoryChipRow(
+    selected: ClothesCategory,
+    onSelectedChange: (ClothesCategory) -> Unit
 ) {
-    OutlinedCard(
-        modifier = modifier
-            .height(110.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        colors = CardDefaults.outlinedCardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
+        ClothesCategory.values().forEach { category ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clickable { onSelectedChange(category) }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (selected == category)
+                                Color(0xFFE0E0E0)   // 선택됨
+                            else
+                                Color(0xFFF0F0F0)   // 기본
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = category.emoji,
+                        fontSize = 28.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = category.label,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
     }
 }
 
 /**
- * (+) 정사각형 카드
- */
-@Composable
-private fun AddClothesCard(
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .aspectRatio(1f) // 정사각형
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Add,
-            contentDescription = "옷 추가하기",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(32.dp)
-        )
-    }
-}
-
-/**
- * "모든 옷"에 들어가는 썸네일 카드
- * - 정사각형 안에 이미지 전체가 보이도록 ContentScale.Fit 사용
- * - 추후 Supabase 이미지를 넣을 수 있도록 imageUrl 파라미터도 열어둠
+ * "내 옷" 영역에 들어가는 옷 카드
+ * - 이미지 + 오른쪽 위 북마크 아이콘
+ * - 오른쪽 아래 설정(톱니바퀴) 아이콘
  */
 @Composable
 private fun ClosetThumbnailCard(
     @DrawableRes imageRes: Int,
-    modifier: Modifier = Modifier,
-    imageUrl: String? = null // TODO: Coil AsyncImage 등으로 Supabase URL 렌더링
+    modifier: Modifier = Modifier
 ) {
+    var bookmarked by remember { mutableStateOf(false) }
+
     Card(
         modifier = modifier
-            .aspectRatio(1f), // 정사각형
-        shape = RoundedCornerShape(20.dp),
+            .aspectRatio(0.75f), // 살짝 세로로 긴 비율
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = Color.White
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        // 현재는 로컬 리소스만 사용
-        Image(
-            painter = painterResource(id = imageRes),
-            contentDescription = "옷 이미지",
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
-            contentScale = ContentScale.Fit // 잘리지 않게
+                .padding(8.dp)
+        ) {
+            Image(
+                painter = painterResource(id = imageRes),
+                contentDescription = "옷 이미지",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .align(Alignment.Center),
+                contentScale = ContentScale.Fit
+            )
+
+            // 북마크 (상단 오른쪽)
+            IconButton(
+                onClick = { bookmarked = !bookmarked },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(22.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.BookmarkBorder,
+                    contentDescription = "저장하기",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // 설정 (하단 오른쪽)
+            IconButton(
+                onClick = {
+                    // TODO: 옷 상세 설정 화면으로 이동
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(22.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = "설정",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+@Composable
+private fun ClosetCategoryChip(
+    category: ClosetCategory,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(64.dp)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 동그란 배경
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(
+                    if (selected) Color(0xFFE6E8F5) else Color(0xFFF2F3F7)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = category.emoji,
+                fontSize = 28.sp
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = category.label,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
         )
     }
 }
-
-/**
- * 아래쪽 "보관함 / 저장한 코디 보기" 한 줄 카드
- * - 높이·패딩을 줄여서 타이포 크기와 비율 맞추기
- */
 @Composable
-private fun ActionRowCard(
-    title: String,
-    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit
+private fun ClosetItemCard(
+    @DrawableRes imageRes: Int,
+    modifier: Modifier = Modifier
 ) {
-    OutlinedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(52.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        colors = CardDefaults.outlinedCardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+    var isBookmarked by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = modifier
+            .aspectRatio(3f / 4f),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
+        Box(
+            modifier = Modifier.fillMaxSize()
         ) {
-            Icon(
-                imageVector = leadingIcon,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            Image(
+                painter = painterResource(id = imageRes),
+                contentDescription = "옷 이미지",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp)
             )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
+
+            // 북마크 (위 오른쪽)
+            IconButton(
+                onClick = { isBookmarked = !isBookmarked },
+                modifier = Modifier.align(Alignment.TopEnd)
+            ) {
+                Icon(
+                    imageVector = if (isBookmarked)
+                        Icons.Filled.Bookmark
+                    else
+                        Icons.Filled.BookmarkBorder,
+                    contentDescription = null,
+                    tint = if (isBookmarked)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // 설정 (아래 오른쪽)
+            IconButton(
+                onClick = { /* TODO: 설정/편집 화면으로 이동 */ },
+                modifier = Modifier.align(Alignment.BottomEnd)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Settings,
+                    contentDescription = "설정",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }

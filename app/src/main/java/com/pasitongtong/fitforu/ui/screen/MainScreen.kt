@@ -25,6 +25,7 @@ import com.pasitongtong.fitforu.viewmodel.MainViewModel
 import com.pasitongtong.fitforu.viewmodel.HomeViewModelFactory
 import com.pasitongtong.fitforu.viewmodel.SavedOutfitViewModel
 
+import com.pasitongtong.fitforu.ui.screen.BodyShapeInfo
 
 // ✅ Home 화면용 ViewModel / Factory (ui 패키지에 만든 파일 기준)
 
@@ -36,6 +37,11 @@ import com.pasitongtong.fitforu.viewmodel.SavedOutfitViewModel
 fun MainScreen(mainViewModel: MainViewModel) {
 
     val navController = rememberNavController()
+
+    // ✅ HomeViewModel 을 MainScreen 레벨에서 한 번만 생성해서 공유
+    val homeViewModel: HomeViewModel = viewModel(
+        factory = HomeViewModelFactory("0449c5e0de9ca76dea138c059277b8a5")
+    )
 
     // 하단 네비게이션에 포함될 화면 리스트
     val bottomNavItems = listOf(
@@ -87,6 +93,10 @@ fun MainScreen(mainViewModel: MainViewModel) {
                 ClosetScreen(navController, mainViewModel)
             }
 
+            composable(Screen.AddClothes.route) {
+                AddClothesScreen(navController = navController)
+            }
+
             composable(Screen.Stylebook.route) {
                 StylebookScreen(navController)
             }
@@ -99,8 +109,16 @@ fun MainScreen(mainViewModel: MainViewModel) {
                 SkeletalAnalysisScreen(navController)
             }
 
+            // 🔥 분석 결과 화면 – 저장하기 누르면 homeViewModel 에 결과 저장
             composable(Screen.AnalysisResult.route) {
-                AnalysisResultScreen(navController = navController)
+                AnalysisResultScreen(
+                    navController = navController,
+                    // TODO: 나중에 서버 라벨 연결. 지금은 임시로 "모래시계형"
+                    bodyShapeLabelFromServer = "모래시계형",
+                    onSaveResult = { info: BodyShapeInfo ->
+                        homeViewModel.saveBodyShape(info)   // ⬅ 아래 2번에서 구현
+                    }
+                )
             }
 
             composable(Screen.OutfitDetail.route) {

@@ -10,10 +10,22 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.pasitongtong.fitforu.ui.screen.BodyShapeInfo
 
 class HomeViewModel(
     private val repo: WeatherRepository
 ) : ViewModel() {
+
+    // 🔥 체형 분석 결과 (null 이면 아직 안 저장된 상태)
+    var bodyShapeInfo: BodyShapeInfo? by mutableStateOf(null)
+        private set
+
+    fun saveBodyShape(info: BodyShapeInfo) {
+        bodyShapeInfo = info
+    }
 
     private val _state = MutableStateFlow(HomeUiState())
     val state = _state.asStateFlow()
