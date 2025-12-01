@@ -2,7 +2,11 @@ package com.pasitongtong.fitforu.ui.screen
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,18 +85,24 @@ fun ProfileSetupScreen(
                     return@Button
                 }
 
-                // 3) 내부에서 사용할 gender 값 (백엔드/DB 용)
+                // 3) 백엔드/DB 용 gender 값
                 val genderValue = if (selectedGender == "M") "male" else "female"
 
-                // ✅ 여기서 MainViewModel 쪽으로 프로필 저장 요청 전달
-                //    -> MainViewModel.createProfile() 안에서
-                //       POST /auth/profile 호출하도록 구현하면 됨
-                viewModel.createProfile(userId, genderValue)
-
-                // 4) 메인 화면으로 이동 (프로필 설정 화면 스택 제거)
-                navController.navigate("main") {
-                    popUpTo("profileSetup") { inclusive = true }
-                    launchSingleTop = true
+                // ✅ 백엔드에 프로필 등록 요청
+                viewModel.postBackendProfile(genderValue) { success ->
+                    if (success) {
+                        // 성공 → 메인으로
+                        navController.navigate("main") {
+                            popUpTo("profileSetup") { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    } else {
+                        Toast.makeText(
+                            context,
+                            "프로필 저장에 실패했어요. 다시 시도해 주세요.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
             }
         ) {
@@ -107,7 +117,6 @@ private fun GenderChoiceButton(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    // 선택된 쪽은 Filled, 아닌 쪽은 Outlined 느낌으로 표시
     if (selected) {
         FilledTonalButton(onClick = onClick) {
             Text(label)

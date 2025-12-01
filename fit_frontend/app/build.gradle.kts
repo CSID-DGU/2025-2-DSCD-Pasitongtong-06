@@ -96,6 +96,8 @@ dependencies {
     implementation("androidx.compose.material3:material3")
 
 
+    implementation("io.ktor:ktor-client-okhttp:2.3.12")
+
 
     // Ktor JSON 통신용 (날씨 API)
     implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
@@ -113,4 +115,5 @@ dependencies {
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
 
+    implementation("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
 }

@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.pasitongtong.fitforu.ui.Screen
 import com.pasitongtong.fitforu.viewmodel.HomeViewModel
+import androidx.compose.foundation.background
 
 @Composable
 fun HomeScreen(
@@ -27,74 +28,82 @@ fun HomeScreen(
     val uiState by viewModel.state.collectAsState()
     val bodyShapeInfo = viewModel.bodyShapeInfo   // 🔹 HomeViewModel 에 추가한 체형 결과
 
-    Column(
+    // 🔥 전체 화면 흰색 배경
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(Color.White)
     ) {
-        // ─── 상단 앱 이름 ───
-        Text(
-            text = "FitForU",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // ─── 상단 날씨 카드 ───
-        WeatherSummaryCard(
-            dateText = uiState.dateText,
-            maxTemp = uiState.maxTemp,
-            minTemp = uiState.minTemp,
-            diffText = uiState.diffText,
-            loading = uiState.loading,
-            weatherEmoji = uiState.weatherIcon,
-            onRefreshClick = { viewModel.refresh() }
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // ─── 체형 분석 카드 (결과 없으면 CTA, 있으면 결과 카드) ───
-        if (bodyShapeInfo == null) {
-            BodyAnalysisCtaCard(
-                onClick = { navController.navigate(Screen.SkeletalAnalysis.route) }
-            )
-        } else {
-            BodyAnalysisResultCard(info = bodyShapeInfo)
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // ─── "오늘 날씨에 딱이에요 👏" 헤더 + 리프레시 ───
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Top,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // ─── 상단 앱 이름 ───
             Text(
-                text = "오늘 날씨에 딱이에요 👏",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                text = "FitForU",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
             )
-            IconButton(onClick = { viewModel.refresh() }) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "다른 코디 보기"
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ─── 상단 날씨 카드 ───
+            WeatherSummaryCard(
+                dateText = uiState.dateText,
+                maxTemp = uiState.maxTemp,
+                minTemp = uiState.minTemp,
+                diffText = uiState.diffText,
+                loading = uiState.loading,
+                weatherEmoji = uiState.weatherIcon,
+                onRefreshClick = { viewModel.refresh() }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // ─── 체형 분석 카드 (결과 없으면 CTA, 있으면 결과 카드) ───
+            if (bodyShapeInfo == null) {
+                BodyAnalysisCtaCard(
+                    onClick = { navController.navigate(Screen.SkeletalAnalysis.route) }
                 )
+            } else {
+                BodyAnalysisResultCard(info = bodyShapeInfo)
             }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ─── "오늘 날씨에 딱이에요 👏" 헤더 + 리프레시 ───
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "오늘 날씨에 딱이에요 👏",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                IconButton(onClick = { viewModel.refresh() }) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "다른 코디 보기"
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ─── 오늘의 코디 회색 카드 ───
+            OutfitResultCard(
+                loading = uiState.loading,
+                onCardClick = { navController.navigate(Screen.OutfitDetail.route) }
+            )
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // ─── 오늘의 코디 회색 카드 ───
-        OutfitResultCard(
-            loading = uiState.loading,
-            onCardClick = { navController.navigate(Screen.OutfitDetail.route) }
-        )
     }
 }
+
 
 @Composable
 private fun WeatherSummaryCard(

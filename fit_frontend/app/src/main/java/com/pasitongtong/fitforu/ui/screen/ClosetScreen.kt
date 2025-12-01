@@ -51,7 +51,7 @@ data class ClosetCategory(
 
 // 실제로 사용할 카테고리들
 private val closetCategories = listOf(
-    ClosetCategory(id = "ALL",    label = "전체",  emoji = "👕"),  // 전체 = 티셔츠 아이콘
+    ClosetCategory(id = "ALL",    label = "전체",  emoji = "\uD83D\uDDC4"),  // 전체 = 티셔츠 아이콘
     ClosetCategory(id = "OUTER",  label = "아우터", emoji = "🧥"),
     ClosetCategory(id = "TOP",    label = "상의",  emoji = "👚"),
     ClosetCategory(id = "BOTTOM", label = "하의",  emoji = "👖"),
@@ -60,7 +60,7 @@ private val closetCategories = listOf(
 
 // 카테고리 정보(백엔드 연동 시 id 값만 맞춰 쓰면 됨)
 private enum class ClothesCategory(val id: String, val label: String, val emoji: String) {
-    ALL("ALL", "전체", "\uD83D\uDC56"),      // 옷걸이 느낌 이모지
+    ALL("ALL", "전체", "\uD83D\uDDC4"),      // 옷걸이 느낌 이모지
     OUTER("OUTER", "아우터", "\uD83E\uDDE5"), // 🧥
     TOP("TOP", "상의", "\uD83D\uDC55"),      // 👕
     BOTTOM("BOTTOM", "하의", "\uD83D\uDC56"), // 👖
@@ -72,31 +72,29 @@ fun ClosetScreen(
     navController: NavController,
     viewModel: MainViewModel
 ) {
-    var selectedCategoryId by remember { mutableStateOf("ALL") }   // 기본: 전체
-    val totalCount = 3  // TODO: 나중에 백엔드에서 실제 개수 받아오기
+    var selectedCategoryId by remember { mutableStateOf("ALL") }
+    val totalCount = 3
 
     Scaffold(
+        containerColor = Color.White,   // 🔥 전체 배경 흰색
         topBar = {
             ClosetTopBar(
                 onBackClick = { navController.popBackStack() },
-                onAddClick = {
-                    // ➕ 눌렀을 때 옷 저장 화면으로 이동
-                    navController.navigate(Screen.AddClothes.route)
-                }
+                onAddClick = { navController.navigate(Screen.AddClothes.route) }
             )
         }
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(Color.White)      // 🔥 내용 영역도 흰색
                 .padding(innerPadding)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.Start
         ) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ------- "내 옷" 타이틀 -------
             Text(
                 text = "내 옷",
                 style = MaterialTheme.typography.headlineSmall,
@@ -105,7 +103,6 @@ fun ClosetScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ------- 카테고리 아이콘 Row (이모지 사용) -------
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -121,7 +118,6 @@ fun ClosetScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 총 N개 / 정렬순
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -132,9 +128,7 @@ fun ClosetScreen(
                     style = MaterialTheme.typography.bodySmall
                 )
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "저장한 순",
                         style = MaterialTheme.typography.bodySmall
@@ -152,13 +146,13 @@ fun ClosetScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ------- 옷 리스트 들어가는 회색 영역 (조금 더 크게) -------
+            // ------- 옷 리스트 들어가는 회색 영역 -------
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),   // 남은 높이 전부 사용,   // 🔹 회색 박스 더 크게
+                    .weight(1f),   // 남은 높이 전부 사용
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFF3F4F7)
+                    containerColor = Color(0xFFF3F4F7)   // ✅ 다시 연한 회색으로
                 ),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
@@ -173,9 +167,11 @@ fun ClosetScreen(
                     ClosetItemCard(imageRes = R.drawable.closet3, modifier = Modifier.weight(1f))
                 }
             }
+
         }
     }
 }
+
 
 
 /**
@@ -186,33 +182,42 @@ private fun ClosetTopBar(
     onBackClick: () -> Unit,
     onAddClick: () -> Unit
 ) {
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+            .padding(horizontal = 8.dp, vertical = 8.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBackClick) {
-                Icon(
-                    imageVector = Icons.Filled.ArrowBack,
-                    contentDescription = "뒤로가기"
-                )
-            }
-            Text(
-                text = "FitForU",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+        // ⬅️ 뒤로가기 버튼
+        IconButton(
+            onClick = onBackClick,
+            modifier = Modifier.align(Alignment.CenterStart)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.ArrowBack,
+                contentDescription = "뒤로가기"
             )
         }
-        IconButton(onClick = onAddClick) {
+
+        // 🟣 중앙 텍스트
+        Text(
+            text = "FitForU",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.align(Alignment.Center)
+        )
+
+        // ➕ 추가 버튼
+        IconButton(
+            onClick = onAddClick,
+            modifier = Modifier.align(Alignment.CenterEnd)
+        ) {
             Icon(
                 imageVector = Icons.Filled.Add,
                 contentDescription = "옷 추가하기"
             )
         }
     }
+
 }
 
 /**

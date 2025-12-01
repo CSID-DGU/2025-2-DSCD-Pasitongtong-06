@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.pasitongtong.fitforu.R
 import com.pasitongtong.fitforu.ui.Screen
+import androidx.compose.foundation.background
 
 //for 프리뷰
 import androidx.compose.ui.tooling.preview.Preview
@@ -116,39 +117,50 @@ fun AnalysisResultScreen(
                             contentDescription = "뒤로가기"
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = Color.White,   // 🔥 상단 배경 흰색
+                    titleContentColor = Color.Black,
+                    navigationIconContentColor = Color.Black
+                )
+
+
             )
         },
-        // 🔹 전체 배경은 테마 기본색 (거의 흰색)
-        containerColor = MaterialTheme.colorScheme.background
+
+        // ⬇⬇⬇ 🔥 배경 강제 흰색
+        containerColor = Color.White
     ) { innerPadding ->
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Color.White)   // ⬅⬅⬅ 🔥 여기도 흰색으로 명시
                 .padding(innerPadding)
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            // ─── 상단 텍스트 ───
             Text(
                 text = "👏 당신의 체형 분석 결과입니다",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth()
             )
+
             Spacer(modifier = Modifier.height(4.dp))
+
             Text(
                 text = "이제 핏포유가 제안하는 코디를 만나보세요.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ─── 중앙 로봇 / 캐릭터 이미지 ───
             Image(
                 painter = painterResource(id = bodyShapeInfo.imageRes),
                 contentDescription = bodyShapeInfo.label,
@@ -160,16 +172,12 @@ fun AnalysisResultScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ─── 하단 연파랑 카드 (피그마 스타일) ───
             Card(
-                modifier = Modifier
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    // ⬅ 여기 색만 연한 파랑으로
-                    containerColor = Color(0xFFE6F4FF)
+                    containerColor = Color(0xFFE6F4FF)   // 연파랑 (유지)
                 ),
-                shape = MaterialTheme.shapes.extraLarge,
-                elevation = CardDefaults.cardElevation(0.dp)
+                shape = MaterialTheme.shapes.extraLarge
             ) {
                 Column(
                     modifier = Modifier
@@ -209,10 +217,7 @@ fun AnalysisResultScreen(
                     ) {
                         OutlinedButton(
                             modifier = Modifier.weight(1f),
-                            onClick = {
-                                // 다시 진단하기 → 바로 이전(체형분석)으로
-                                navController.popBackStack()
-                            }
+                            onClick = { navController.popBackStack() }
                         ) {
                             Text("다시 진단하기")
                         }
@@ -220,10 +225,7 @@ fun AnalysisResultScreen(
                         Button(
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                // 1) 홈 뷰모델에 결과 저장
                                 onSaveResult(bodyShapeInfo)
-
-                                // 2) 홈 화면으로 이동
                                 navController.navigate(Screen.Home.route) {
                                     popUpTo(Screen.Home.route) { inclusive = false }
                                     launchSingleTop = true
@@ -232,13 +234,13 @@ fun AnalysisResultScreen(
                         ) {
                             Text("저장하기")
                         }
-
                     }
                 }
             }
         }
     }
 }
+
 
 @Preview(showBackground = true)
 @Composable

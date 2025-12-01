@@ -26,6 +26,7 @@ import coil.compose.AsyncImage
 import com.pasitongtong.fitforu.R
 import com.pasitongtong.fitforu.ui.Screen
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.background
 
 @Composable
 fun SkeletalAnalysisScreen(navController: NavController) {
@@ -33,27 +34,25 @@ fun SkeletalAnalysisScreen(navController: NavController) {
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        selectedImageUri = uri
-    }
+    ) { uri -> selectedImageUri = uri }
 
     Scaffold(
-        topBar = { TopHeader(navController) }
+        topBar = { TopHeader(navController) },
+        containerColor = Color.White      // 🔥 전체 화면 흰색
     ) { innerPadding ->
 
         val scrollState = rememberScrollState()
 
-        // 🔥 스크롤을 제일 바깥 Modifier 로 둔다
         Column(
             modifier = Modifier
-                .verticalScroll(scrollState)          // ⬅ 맨 앞에!
+                .verticalScroll(scrollState)
                 .fillMaxSize()
+                .background(Color.White)  // 🔥 내부도 흰색
                 .padding(innerPadding)
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            // 1. 전신 사진 업로드 카드
             PhotoUploadCard(
                 imageUri = selectedImageUri,
                 onClick = { galleryLauncher.launch("image/*") }
@@ -61,7 +60,6 @@ fun SkeletalAnalysisScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 2. 분석하기 버튼
             Button(
                 onClick = { navController.navigate(Screen.AnalysisResult.route) },
                 enabled = selectedImageUri != null,
@@ -74,47 +72,55 @@ fun SkeletalAnalysisScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // 3. “! 꼭 읽어보세요 / Tip + body 이미지” 영역
             BodyTipSection()
-
             Spacer(modifier = Modifier.height(28.dp))
 
-            // 4. 체형 타입 안내 (여성 / 남성 실루엣)
             SkeletalTypeInfo()
-
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
+
 @Composable
 fun TopHeader(navController: NavController) {
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 16.dp, horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 16.dp, horizontal = 16.dp)
     ) {
+        // ⬅️ Back 버튼 (왼쪽 정렬)
         Icon(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             contentDescription = "뒤로가기",
             modifier = Modifier
                 .size(24.dp)
+                .align(Alignment.CenterStart)
                 .clickable {
-                    navController.navigate("home") {
+                    navController.navigate(route = "home") {
                         popUpTo("home") { inclusive = true }
                         launchSingleTop = true
                     }
                 }
         )
-        Spacer(modifier = Modifier.width(16.dp))
+
+        // 🔥 중앙 제목
         Text(
-            text = "Skeletal Analysis",
+            text = "FitForU",
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.align(Alignment.Center)
+        )
+
+        // ➕ 오른쪽 여백을 맞추는 목적 (필요하면)
+        Spacer(
+            modifier = Modifier
+                .size(24.dp)
+                .align(Alignment.CenterEnd)
         )
     }
 }
+
 
 @Composable
 fun PhotoUploadCard(imageUri: Uri?, onClick: () -> Unit) {

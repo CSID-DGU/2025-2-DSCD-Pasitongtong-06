@@ -14,6 +14,23 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
+// ---------- Ktor(백엔드 호출용) ----------
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.header
+import io.ktor.client.request.setBody
+import io.ktor.client.call.body
+import io.ktor.http.HttpHeaders
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
+import io.ktor.http.isSuccess
+
 // Supabase profiles 테이블과 매핑
 @Serializable
 data class Profile(
@@ -34,7 +51,24 @@ sealed interface AuthUiState {
 
 class MainViewModel : ViewModel() {
 
+    // Supabase 클라이언트
     private val client = SupabaseProvider.client
+
+    // 🔹 FastAPI 백엔드 주소
+    // 에뮬레이터: http://10.0.2.2:8000
+    private val backendBaseUrl = "http://10.0.2.2:8000"
+
+    // 🔹 Ktor HTTP 클라이언트
+    private val httpClient = HttpClient(OkHttp) {
+        install(ContentNegotiation) {
+            json(
+                Json {
+                    ignoreUnknownKeys = true
+                    prettyPrint = true
+                }
+            )
+        }
+    }
 
     // 현재 로그인한 사용자 id
     var userId: String? = null
@@ -54,7 +88,12 @@ class MainViewModel : ViewModel() {
                 if (user != null) {
                     userId = user.id
                     _authState.value = AuthUiState.Authed(email = user.email)
+
+                    // Supabase profiles 테이블에서 읽기 (있으면)
                     loadMyProfile(user.id)
+
+                    // 백엔드 /users/me 도 한 번 체크
+                    fetchBackendMe()
                 } else {
                     _authState.value = AuthUiState.Idle
                 }
@@ -80,7 +119,12 @@ class MainViewModel : ViewModel() {
                 if (user != null) {
                     userId = user.id
                     _authState.value = AuthUiState.Authed(email = user.email)
+
+                    // Supabase profiles
                     loadMyProfile(user.id)
+
+                    // ✅ 로그인 직후 백엔드 /users/me 호출
+                    fetchBackendMe()
                 } else {
                     _authState.value = AuthUiState.Error("카카오 로그인 후 사용자 정보를 찾지 못했습니다.")
                 }
@@ -105,7 +149,7 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    /** profiles 테이블에서 내 프로필 가져오기 */
+    /** Supabase profiles 테이블에서 내 프로필 가져오기 */
     fun loadMyProfile(userId: String) = viewModelScope.launch {
         try {
             val profile = client.postgrest["profiles"]
@@ -120,53 +164,121 @@ class MainViewModel : ViewModel() {
             _authState.value = AuthUiState.Authed(email = currentEmail)
         } catch (e: Exception) {
             // 프로필 없음 → ProfileSetupScreen 필요
-            Log.i("MainViewModel", "profile 없음, PROFILE_REQUIRED. ${e.message}")
+            Log.i("MainViewModel", "Supabase profile 없음, PROFILE_REQUIRED. ${e.message}")
             _profile.value = null
             _authState.value = AuthUiState.Error("PROFILE_REQUIRED")
         }
     }
 
-    /** 프로필 최초 생성 (성별 선택 후) */
-    fun createProfile(userId: String, gender: String) {
+    // ─────────────────────────────────────────────
+    //  🔥 POST /users/profile : 성별을 백엔드에 저장
+    // ─────────────────────────────────────────────
+    fun postBackendProfile(
+        gender: String,
+        onResult: (Boolean) -> Unit = {}
+    ) {
         viewModelScope.launch {
             try {
-                val authUser = client.auth.currentUserOrNull()
-                    ?: error("로그인 정보 없음")
+                // 1) Supabase 세션에서 accessToken 꺼내기
+                val session = client.auth.currentSessionOrNull()
+                    ?: error("Supabase 세션이 없습니다. (로그인 먼저 필요)")
 
-                // ⚡ profiles 테이블에 내 프로필 upsert (없으면 insert, 있으면 update)
-                client.postgrest["profiles"].upsert(
-                    Profile(
-                        user_id = userId,
-                        gender = gender,
-                        // height_cm, weight_kg, banned_items 는 지금은 null 로 둔다
-                        height_cm = null,
-                        weight_kg = null,
-                        banned_items = null
+                val accessToken = session.accessToken
+                Log.d("Backend", "accessToken: $accessToken")
+
+                // 2) POST /users/profile 호출 (JSON body: { "gender": "male" } 이런 식)
+                val response = httpClient.post("$backendBaseUrl/users/profile") {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        mapOf(
+                            "gender" to gender
+                        )
                     )
+                }
+
+                val bodyText: String = response.body()
+                Log.d(
+                    "Backend",
+                    "POST /users/profile status=${response.status.value}, body=$bodyText"
                 )
 
-                // 로컬 상태 갱신
-                _profile.value = Profile(
-                    user_id = userId,
-                    gender = gender
-                )
-                _authState.value = AuthUiState.Authed(email = authUser.email)
+                if (response.status.isSuccess()) {
+                    // 성공이면 앞으로는 GET /users/me 가 200이 떨어져야 함
+                    _authState.value =
+                        AuthUiState.Authed(email = client.auth.currentUserOrNull()?.email)
+                    onResult(true)
+                } else {
+                    onResult(false)
+                }
             } catch (e: Exception) {
-                Log.e("MainViewModel", "createProfile 실패", e)
-
-                // ❗ 임시 방편: DB 에러여도 앱은 진행되게 하기
-                val email = client.auth.currentUserOrNull()?.email
-                _profile.value = Profile(
-                    user_id = userId,
-                    gender = gender
-                )
-                _authState.value = AuthUiState.Authed(email = email)
-
-                // 만약 꼭 에러를 보여주고 싶으면 위 Authed 대신 Error 로 바꾸면 됨
-                // _authState.value = AuthUiState.Error("PROFILE_CREATE_FAILED")
+                Log.e("Backend", "POST /users/profile 실패: ${e.message}", e)
+                onResult(false)
             }
         }
     }
 
-}
+    // ─────────────────────────────────────────────
+    //  🔥 GET /users/me : 백엔드 프로필 존재 여부 확인
+    // ─────────────────────────────────────────────
+    fun fetchBackendMe() {
+        viewModelScope.launch {
+            // 필요하다면 로딩 상태 표시
+            _authState.value = AuthUiState.Loading
 
+            try {
+                // 1) Supabase 세션에서 access_token 꺼내기
+                val session = client.auth.currentSessionOrNull()
+                if (session == null) {
+                    Log.e("Backend", "세션 없음, /users/me 호출 불가")
+                    _authState.value = AuthUiState.Error("NO_SESSION")
+                    return@launch
+                }
+
+                val accessToken = session.accessToken
+                Log.d("Backend", "accessToken: $accessToken")
+
+                // 2) GET /users/me 호출
+                val response = httpClient.get("$backendBaseUrl/users/me") {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
+
+                val bodyText: String = response.body()
+                Log.d(
+                    "Backend",
+                    "GET /users/me status=${response.status.value}, body=$bodyText"
+                )
+
+                // 3) 상태코드에 따라 분기
+                when (response.status) {
+                    HttpStatusCode.OK -> {
+                        // 백엔드에도 프로필이 있는 정상 상태
+                        val email = client.auth.currentUserOrNull()?.email
+                        _authState.value = AuthUiState.Authed(email = email)
+                    }
+
+                    HttpStatusCode.NotFound -> {
+                        // 백엔드가 "프로필이 없다" 라고 알려준 상태 → 프로필 설정 화면으로
+                        Log.d("Backend", "백엔드 프로필 없음 → PROFILE_REQUIRED")
+                        _authState.value = AuthUiState.Error("PROFILE_REQUIRED")
+                    }
+
+                    else -> {
+                        // 그 외 status 는 전부 백엔드 에러로 처리
+                        Log.e("Backend", "예상 밖 상태코드: ${response.status}")
+                        _authState.value =
+                            AuthUiState.Error("BACKEND_ERROR_${response.status.value}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("Backend", "/users/me 호출 실패: ${e.message}", e)
+                _authState.value = AuthUiState.Error("BACKEND_EXCEPTION")
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        httpClient.close()
+    }
+}

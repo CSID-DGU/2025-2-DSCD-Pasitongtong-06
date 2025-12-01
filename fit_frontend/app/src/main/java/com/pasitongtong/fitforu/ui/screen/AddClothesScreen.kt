@@ -28,6 +28,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import coil.compose.AsyncImage
 import com.pasitongtong.fitforu.R
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.background
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,10 +37,8 @@ fun AddClothesScreen(
 ) {
     val scrollState = rememberScrollState()
 
-    // 선택한 이미지 Uri
     var selectedImageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
 
-    // 갤러리에서 사진 한 장 선택
     val pickImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -67,16 +66,22 @@ fun AddClothesScreen(
                             contentDescription = "뒤로가기"
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = Color.White,          // ✅ 앱바 배경 흰색
+                    scrolledContainerColor = Color.White
+                )
             )
-        }
+        },
+        containerColor = Color.White          // ✅ 전체 배경을 흰색으로
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Color.White)      // ✅ 내용 영역도 흰색
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
-                .verticalScroll(scrollState)       // 🔹 아래까지 스크롤 가능
+                .verticalScroll(scrollState),
         ) {
 
             Text(
@@ -98,14 +103,13 @@ fun AddClothesScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(220.dp)
-                    .clickable { launchPicker() },   // 🔹 카드 눌러도 갤러리 열림
+                    .clickable { launchPicker() },
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFF4F4F4)
+                    containerColor = Color(0xFFF4F4F4)   // ⬅ 업로드 박스는 연회색 유지
                 ),
                 shape = RoundedCornerShape(24.dp)
             ) {
                 if (selectedImageUri == null) {
-                    // 아직 선택 안 했을 때 – 기존 안내 UI
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.Center,
@@ -128,7 +132,6 @@ fun AddClothesScreen(
                         )
                     }
                 } else {
-                    // 사진을 선택한 후 – 선택한 이미지 보여주기
                     AsyncImage(
                         model = selectedImageUri,
                         contentDescription = "선택한 옷 사진",
@@ -140,7 +143,6 @@ fun AddClothesScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ───── 추가하기 버튼: 갤러리 열기 ─────
             Button(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -165,7 +167,6 @@ fun AddClothesScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ───── TIP 카드 (아래까지 스크롤 가능) ─────
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -203,6 +204,7 @@ fun AddClothesScreen(
         }
     }
 }
+
 
 @Preview(showBackground = true)
 @Composable

@@ -9,19 +9,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect          // 🔹 추가
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.google.accompanist.systemuicontroller.rememberSystemUiController // 🔹 추가
 import com.pasitongtong.fitforu.ui.screen.LoginScreen
 import com.pasitongtong.fitforu.ui.screen.MainScreen
 import com.pasitongtong.fitforu.ui.screen.ProfileSetupScreen
 import com.pasitongtong.fitforu.ui.theme.FitForUTheme
 import com.pasitongtong.fitforu.viewmodel.MainViewModel
 import com.pasitongtong.fitforu.viewmodel.AuthUiState
-
 
 class MainActivity : ComponentActivity() {
 
@@ -32,6 +33,20 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             FitForUTheme {
+
+                // 🔥 여기에서 한 번만 시스템바 색/아이콘 설정
+                val systemUiController = rememberSystemUiController()
+                SideEffect {
+                    systemUiController.setStatusBarColor(
+                        color = androidx.compose.ui.graphics.Color.White,
+                        darkIcons = true          // ← 아이콘을 항상 검정으로
+                    )
+                    systemUiController.setNavigationBarColor(
+                        color = androidx.compose.ui.graphics.Color.White,
+                        darkIcons = true
+                    )
+                }
+
                 val navController = rememberNavController()
                 val authState by viewModel.authState.collectAsState()
 

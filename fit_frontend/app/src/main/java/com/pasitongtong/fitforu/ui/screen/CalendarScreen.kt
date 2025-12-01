@@ -25,6 +25,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import kotlin.math.ceil
 import androidx.compose.ui.layout.ContentScale
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
 data class OutfitThumbnail(
     val date: LocalDate,
@@ -35,45 +36,52 @@ data class OutfitThumbnail(
 @Composable
 fun CalendarScreen(
     navController: NavController,
-    // 나중에 ViewModel 에서 받아올 데이터
-    outfits: List<OutfitThumbnail> = sampleOutfits()
+    outfits: List<OutfitThumbnail> = sampleOutfits(),
 ) {
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+    val outfitsByDate = remember(outfits) { outfits.groupBy { it.date } }
 
-    // 날짜별로 그룹핑
-    val outfitsByDate: Map<LocalDate, List<OutfitThumbnail>> =
-        remember(outfits) { outfits.groupBy { it.date } }
+    val systemUiController = rememberSystemUiController()
+
+    SideEffect {
+        systemUiController.setStatusBarColor(
+            color = Color.White,          // ← 원하는 색
+            darkIcons = true              // 아이콘을 검정색으로 만들지 여부
+        )
+    }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(text = "FitForU", fontWeight = FontWeight.Bold) },
+                title = { Text("FitForU", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "뒤로가기"
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로가기")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = Color.White,          // 배경 흰색
+                    navigationIconContentColor = Color.Black,
+                    titleContentColor = Color.Black
+                )
             )
-        }
+        },
+        containerColor = Color.White   // ← ① 배경 흰색
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .background(Color.White)      // ← ② 전체 Column 흰색
                 .padding(horizontal = 16.dp)
         ) {
 
-            // ─── 년/월 헤더 ───
+            Spacer(modifier = Modifier.height(4.dp))
+
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 4.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
             ) {
                 Text(
                     text = "${currentMonth.year}년 ${currentMonth.monthValue}월 ▾",
@@ -82,44 +90,44 @@ fun CalendarScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // ─── 요일 헤더 ───
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                val days = listOf("일", "월", "화", "수", "목", "금", "토")
-                days.forEachIndexed { index, label ->
+                listOf("일", "월", "화", "수", "목", "금", "토").forEachIndexed { index, label ->
                     Text(
-                        text = label,
+                        label,
                         modifier = Modifier.weight(1f),
                         textAlign = TextAlign.Center,
                         fontSize = 12.sp,
                         color = when (index) {
-                            0 -> Color(0xFFE53935) // 일(빨강)
-                            6 -> Color(0xFF1E88E5) // 토(파랑)
-                            else -> MaterialTheme.colorScheme.onSurface
+                            0 -> Color(0xFFE53935)
+                            6 -> Color(0xFF1E88E5)
+                            else -> Color.Black
                         }
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            // ── 요일 아래 검은 라인
+            Divider(
+                thickness = 0.6.dp,
+                color = Color.Black,
+                modifier = Modifier.padding(vertical = 6.dp)
+            )
 
-            // ─── 날짜 그리드 ───
             CalendarMonthGrid(
                 month = currentMonth,
                 selectedDate = selectedDate,
                 outfitsByDate = outfitsByDate,
-                onDayClick = { clicked ->
-                    selectedDate = clicked
-                }
+                onDayClick = { selectedDate = it }
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 선택된 날짜 텍스트 (필요 없으면 제거해도 됨)
             Text(
                 text = selectedDate?.let { "선택한 날: $it" } ?: "날짜를 선택해 주세요.",
                 style = MaterialTheme.typography.bodyMedium
@@ -127,6 +135,7 @@ fun CalendarScreen(
         }
     }
 }
+
 
 /**
  * 한 달짜리 캘린더 그리드 (일~토)
@@ -141,56 +150,42 @@ private fun CalendarMonthGrid(
 ) {
     val firstDayOfMonth = month.atDay(1)
     val daysInMonth = month.lengthOfMonth()
-
-    // java.time.DayOfWeek: MON(1)~SUN(7) → 우리는 일요일 0부터 시작하고 싶음
-    val firstDayIndex = when (firstDayOfMonth.dayOfWeek) {
-        DayOfWeek.SUNDAY -> 0
-        else -> firstDayOfMonth.dayOfWeek.value
-    }
-
+    val firstDayIndex = if (firstDayOfMonth.dayOfWeek == DayOfWeek.SUNDAY) 0 else firstDayOfMonth.dayOfWeek.value
     val totalCells = firstDayIndex + daysInMonth
     val weeks = ceil(totalCells / 7.0).toInt()
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White)
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         repeat(weeks) { week ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                    .padding(vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                for (dayOfWeek in 0 until 7) {
-                    val cellIndex = week * 7 + dayOfWeek
-                    val dayNumber = cellIndex - firstDayIndex + 1
-
-                    if (dayNumber < 1 || dayNumber > daysInMonth) {
-                        // 빈 칸
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(56.dp)
-                        )
-                    } else {
-                        val date = month.atDay(dayNumber)
-                        val outfits = outfitsByDate[date].orEmpty()
-
+                for (dow in 0 until 7) {
+                    val idx = week * 7 + dow
+                    val day = idx - firstDayIndex + 1
+                    if (day in 1..daysInMonth) {
+                        val date = month.atDay(day)
                         CalendarDayCell(
                             date = date,
                             isSelected = date == selectedDate,
-                            outfits = outfits,
+                            outfits = outfitsByDate[date].orEmpty(),
                             modifier = Modifier.weight(1f),
                             onClick = { onDayClick(date) }
                         )
+                    } else {
+                        Box(modifier = Modifier.weight(1f))
                     }
                 }
             }
+
+            // 🔥 각 주(week) 아래 구분선
+            Divider(thickness = 0.6.dp, color = Color.Black)
         }
     }
 }
+
 
 /**
  * 한 날짜 셀: 숫자 + 코디 썸네일들

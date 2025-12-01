@@ -23,6 +23,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.PaddingValues
 
 /**
  * 사용자가 저장한 코디 조합들을 모아보는 '코디 북' 화면입니다.
@@ -30,15 +33,18 @@ import androidx.navigation.compose.rememberNavController
 @Composable
 fun StylebookScreen(navController: NavController) {
     Scaffold(
+        containerColor = Color.White,   // ⬅️ Scaffold 배경 흰색
         floatingActionButton = {
-            FloatingActionButton(onClick = { /* TODO: 새 코디 만들기 화면으로 이동 */ }) {
+            FloatingActionButton(onClick = { /* TODO */ }) {
                 Icon(Icons.Default.Add, contentDescription = "새 코디 추가")
             }
         }
     ) { paddingValues ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Color.White)   // ⬅️ Column도 흰색
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -49,12 +55,15 @@ fun StylebookScreen(navController: NavController) {
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
+
             Spacer(modifier = Modifier.height(16.dp))
 
-            // TODO: 실제 저장된 코디 리스트로 교체
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2), // 2열 그리드
-                modifier = Modifier.fillMaxSize(),
+                columns = GridCells.Fixed(2),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.White),   // ⬅️ 그리드도 흰색
+                contentPadding = PaddingValues(bottom = 80.dp) // FAB와 겹침 방지
             ) {
                 items(10) { index ->
                     SavedOutfitCard(index)
@@ -63,6 +72,7 @@ fun StylebookScreen(navController: NavController) {
         }
     }
 }
+
 
 @Composable
 fun SavedOutfitCard(index: Int) {
