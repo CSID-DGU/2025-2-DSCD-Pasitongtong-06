@@ -38,9 +38,9 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("SUPABASE_URL과 SUPABASE_KEY 환경 변수가 설정되지 않았습니다.")
+
 # 서비스 롤 키를 쓰면 RLS 우회 가능, Anon 키를 쓰면 토큰 필요. 
 # 여기서는 편의상 JWT 검증 로직을 약식으로 처리하기 위해 클라이언트 초기화.
-
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ================================
@@ -50,7 +50,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ✅ 1. 보안 스키마 정의 (Swagger UI용)
 security = HTTPBearer()
 
-# ✅ 2. 토큰 추출 및 검증 함수 수정
+# ✅ 2. 토큰 추출 및 검증 함수
 async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:
     """
     Swagger UI의 Authorize 버튼이나 헤더의 Authorization: Bearer <token> 에서
@@ -64,9 +64,53 @@ async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Securi
         return user.user.id
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid Token: {str(e)}")
+
+# ================================
+# [추가] 데이터 모델 정의
+# ================================
+class UserProfileCreate(BaseModel):
+    gender: str  # 'male' or 'female'
+
+class RecommendRequest(BaseModel):
+    temperature: Optional[float] = None # 없으면 자동 조회
+    top_k: int = 3
+
 # ================================
 # 3. API 엔드포인트
 # ================================
+
+# [추가] 3-0. 초기 프로필(성별) 저장
+@app.post("/users/profile")
+async def create_user_profile(
+    profile: UserProfileCreate,
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    프론트엔드에서 회원가입/로그인 직후 성별을 선택했을 때 호출합니다.
+    Supabase profiles 테이블에 user_id와 gender를 저장(Upsert)합니다.
+    """
+    try:
+        # DB에 저장할 데이터 준비
+        data = {
+            "id": user_id,
+            "gender": profile.gender,
+            # 초기 생성 시 다른 필드는 None 또는 기본값으로 설정
+            "body_shape": None, 
+            "body_metrics": None
+        }
+        
+        # profiles 테이블에 upsert (이미 있으면 업데이트, 없으면 생성)
+        res = supabase.table("profiles").upsert(data).execute()
+        
+        return JSONResponse(status_code=200, content={
+            "ok": True,
+            "message": "Profile created successfully",
+            "data": res.data[0] if res.data else {}
+        })
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
+
 
 # 3-1. 체형 분석 및 프로필 저장
 @app.post("/user/analyze-shape")
@@ -195,10 +239,6 @@ async def upload_clothes(
 
 
 # 3-3. 코디 추천 (DB 조회 -> 추천)
-class RecommendRequest(BaseModel):
-    temperature: Optional[float] = None # 없으면 자동 조회
-    top_k: int = 3
-
 @app.post("/recommend/outfit")
 async def recommend_endpoint(
     req: RecommendRequest, 
@@ -277,6 +317,7 @@ async def get_my_profile(user_id: str = Depends(get_current_user_id)):
         profile_data = profile_res.data[0] if profile_res.data else None
         
         if not profile_data:
+            # ✅ 핵심 로직: 프로필이 없으면 404 리턴 -> 프론트엔드가 이를 감지하여 성별 입력 화면으로 이동
             return JSONResponse(status_code=404, content={"ok": False, "error": "프로필이 존재하지 않습니다."})
 
         return JSONResponse(status_code=200, content={
@@ -286,7 +327,7 @@ async def get_my_profile(user_id: str = Depends(get_current_user_id)):
             "shape": profile_data.get("body_shape"),
             "metrics": profile_data.get("body_metrics"),
             "wardrobe_count": wardrobe_res.count,
-            "joined_at": profile_data.get("updated_at")  # 생성일 대신 업데이트일 사용
+            "joined_at": profile_data.get("updated_at")
         })
 
     except Exception as e:
@@ -303,7 +344,6 @@ async def delete_my_account(user_id: str = Depends(get_current_user_id)):
     """
     try:
         # 1. 스토리지 파일 삭제
-        # 사용자의 폴더(user_id/) 안에 있는 파일들을 리스트업해서 삭제해야 함
         files_list = supabase.storage.from_("wardrobe_images").list(path=user_id)
         
         if files_list:
@@ -311,11 +351,7 @@ async def delete_my_account(user_id: str = Depends(get_current_user_id)):
             supabase.storage.from_("wardrobe_images").remove(files_to_remove)
 
         # 2. DB 데이터 삭제
-        # profiles 테이블을 지우면 cascade 설정 덕분에 wardrobe 테이블도 자동 삭제됨
         supabase.table("profiles").delete().eq("id", user_id).execute()
-
-        # (선택) Auth 계정 자체를 지우려면 supabase admin api 사용 필요 (Service Role Key 필수)
-        # 현재는 anon 키를 사용 중이라 가정하고 데이터만 지웁니다.
 
         return JSONResponse(status_code=200, content={
             "ok": True, 
