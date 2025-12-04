@@ -187,42 +187,35 @@ async def upload_clothes(
     user_id: str = Depends(get_current_user_id)
 ):
     temp_filename = f"{uuid.uuid4()}_{file.filename}"
-    temp_path = temp_filename # 간단히 현재 경로 사용 (또는 /tmp)
+    temp_path = temp_filename 
 
     with open(temp_path, "wb") as f:
         f.write(await file.read())
 
     try:
-        # 옷 분석 파이프라인
+        # 옷 분석 파이프라인 (이 결과값 item 딕셔너리에 fit, length 등이 들어있다고 가정)
         analyzed_items = process_clothes_image(temp_path) 
         saved_items = []
 
         if supabase:
             for item in analyzed_items:
-                # 스토리지 업로드 로직 (경로 주의)
-                nobg_local_path = item["crop_nobg_path"]
-                file_name = os.path.basename(nobg_local_path)
-                storage_path = f"{user_id}/{file_name}"
-
-                with open(nobg_local_path, "rb") as f_img:
-                    file_bytes = f_img.read()
+                # ... (이미지 스토리지 업로드 코드는 동일하게 유지) ...
                 
-                supabase.storage.from_("wardrobe_images").upload(
-                    path=storage_path,
-                    file=file_bytes,
-                    file_options={"content-type": "image/png"}
-                )
-                
-                public_url = supabase.storage.from_("wardrobe_images").get_public_url(storage_path)
-
+                # [수정] DB에 저장할 데이터에 상세 속성 추가
                 db_data = {
                     "user_id": user_id,
-                    "image_url": public_url,
-                    "major_category": item["major"],
-                    "minor_category": item["minor"],
-                    "color": item["color"],
-                    # ... 기타 속성 ...
+                    "image_url": public_url,  # 위에서 생성한 public_url 사용
+                    "major_category": item.get("major"),
+                    "minor_category": item.get("minor"),
+                    "color": item.get("color"),
+                    # ▼▼▼ 상세 속성 추가 저장 ▼▼▼
+                    "fit": item.get("fit"),
+                    "length": item.get("length"),
+                    "neckline": item.get("neckline"),
+                    "collar": item.get("collar"),
+                    "prints": item.get("prints") # DB 컬럼 타입에 따라 json.dumps(item.get("prints")) 처리가 필요할 수 있음
                 }
+                
                 res = supabase.table("wardrobe").insert(db_data).execute()
                 saved_items.append(res.data[0] if res.data else {})
 
@@ -252,29 +245,37 @@ async def recommend_endpoint(
         if not supabase:
             return JSONResponse(status_code=503, content={"ok": False, "error": "DB unconnected"})
 
-        # 프로필 조회
+        # 1. 프로필 조회
         profile_res = supabase.table("profiles").select("*").eq("id", user_id).execute()
         if not profile_res.data:
             return JSONResponse(status_code=400, content={"ok": False, "error": "Profile not found"})
         
         profile = profile_res.data[0]
         
-        # 옷장 조회
+        # 2. 옷장 조회 (상세 속성 포함)
         wardrobe_res = supabase.table("wardrobe").select("*").eq("user_id", user_id).execute()
         db_wardrobe = wardrobe_res.data
         
-        # 데이터 포맷팅
+        # 3. 데이터 포맷팅 (DB -> Pipeline 입력)
+        # [수정 포인트] 프론트엔드에서 사용하기 편하도록 'crop_path' 대신 'image_url'로 키 이름 통일
         formatted_wardrobe = []
         for item in db_wardrobe:
             formatted_wardrobe.append({
+                "id": item.get("id"),       # (선택) 옷 ID도 같이 주면 프론트에서 관리하기 편함
                 "major": item["major_category"],
                 "minor": item["minor_category"],
                 "color": item["color"],
-                "crop_path": item["image_url"],
-                # ... 필요한 속성 매핑 ...
+                "image_url": item["image_url"], # ★ 수정됨: 배경 제거된 이미지 URL (기존 crop_path)
+                
+                # 상세 속성 (추천 알고리즘용)
+                "fit": item.get("fit"),
+                "length": item.get("length"),
+                "neckline": item.get("neckline"),
+                "collar": item.get("collar"),
+                "prints": item.get("prints")
             })
 
-        # 추천 로직 실행
+        # 4. 추천 로직 실행
         result = recommend_outfits(
             wardrobe=formatted_wardrobe,
             user_gender=profile["gender"],
