@@ -1,9 +1,11 @@
 package com.pasitongtong.fitforu.ui.screen
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,32 +15,42 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
-import androidx.compose.ui.tooling.preview.Preview
 import coil.compose.AsyncImage
 import com.pasitongtong.fitforu.R
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.foundation.background
+import com.pasitongtong.fitforu.ui.Screen
+import com.pasitongtong.fitforu.viewmodel.MainViewModel
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.compose.rememberNavController
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddClothesScreen(
-    navController: NavController
+    navController: NavController,
+    mainViewModel: MainViewModel
 ) {
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
 
+    // 사용자가 고른(또는 촬영한) 원본 이미지 Uri
     var selectedImageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
 
+    // 업로드 진행 상태
+    var isUploading by rememberSaveable { mutableStateOf(false) }
+
+    // 갤러리/사진 선택 런처
     val pickImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -68,17 +80,17 @@ fun AddClothesScreen(
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.White,          // ✅ 앱바 배경 흰색
+                    containerColor = Color.White,
                     scrolledContainerColor = Color.White
                 )
             )
         },
-        containerColor = Color.White          // ✅ 전체 배경을 흰색으로
+        containerColor = Color.White
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White)      // ✅ 내용 영역도 흰색
+                .background(Color.White)
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
                 .verticalScroll(scrollState),
@@ -105,7 +117,7 @@ fun AddClothesScreen(
                     .height(220.dp)
                     .clickable { launchPicker() },
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFF4F4F4)   // ⬅ 업로드 박스는 연회색 유지
+                    containerColor = Color(0xFFF4F4F4)
                 ),
                 shape = RoundedCornerShape(24.dp)
             ) {
@@ -143,13 +155,57 @@ fun AddClothesScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // 🔥 버튼 동작:
+            //    - 아직 사진이 없으면: 사진 선택
+            //    - 사진이 있으면: /clothes/upload 로 업로드 후 옷장으로 이동
             Button(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(46.dp),
-                onClick = { launchPicker() }
+                enabled = !isUploading,
+                onClick = {
+                    if (selectedImageUri == null) {
+                        // 아직 사진을 안 골랐으면 사진 선택
+                        launchPicker()
+                    } else {
+                        // 사진 있음 → 서버로 업로드
+                        isUploading = true
+
+                        mainViewModel.uploadClothesImage(
+                            context = context,
+                            imageUri = selectedImageUri!!
+                        ) { success, urlOrError ->
+                            isUploading = false
+
+                            if (success && urlOrError != null) {
+                                // TODO: 필요하면 여기서 Supabase wardrobe 테이블에 imageUrl 저장
+                                Toast.makeText(
+                                    context,
+                                    "옷장이에 옷이 추가되었어요!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+
+                                navController.navigate(Screen.Closet.route) {
+                                    popUpTo(Screen.Closet.route) { inclusive = false }
+                                    launchSingleTop = true
+                                }
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "업로드 실패: ${urlOrError ?: "알 수 없는 오류"}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    }
+                }
             ) {
-                Text("추가하기")
+                val btnText = when {
+                    selectedImageUri == null -> "사진 선택하기"
+                    isUploading -> "업로드 중..."
+                    else -> "저장하기"
+                }
+                Text(btnText)
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -206,11 +262,17 @@ fun AddClothesScreen(
 }
 
 
+
 @Preview(showBackground = true)
 @Composable
 fun PreviewAddClothesScreen() {
     MaterialTheme {
         val navController = rememberNavController()
-        AddClothesScreen(navController = navController)
+        val fakeMainViewModel = MainViewModel()   // 👈 프리뷰용 가짜 VM
+
+        AddClothesScreen(
+            navController = navController,
+            mainViewModel = fakeMainViewModel
+        )
     }
 }

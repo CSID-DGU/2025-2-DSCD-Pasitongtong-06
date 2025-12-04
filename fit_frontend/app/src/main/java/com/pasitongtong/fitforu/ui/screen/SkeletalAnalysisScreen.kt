@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -14,31 +15,46 @@ import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.pasitongtong.fitforu.R
 import com.pasitongtong.fitforu.ui.Screen
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.foundation.background
+import com.pasitongtong.fitforu.viewmodel.MainViewModel
 
 @Composable
-fun SkeletalAnalysisScreen(navController: NavController) {
+fun SkeletalAnalysisScreen(
+    navController: NavController,
+    viewModel: MainViewModel
+) {
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
 
+    // 로딩 / 에러 상태
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // 갤러리에서 사진 선택
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri -> selectedImageUri = uri }
 
+    // Compose에서 Context + 프로필(gender) 가져오기
+    val context = LocalContext.current
+    val profile by viewModel.profile.collectAsState()
+    val gender = profile?.gender ?: "F"   // 프로필에 없으면 일단 F로 기본값
+
     Scaffold(
         topBar = { TopHeader(navController) },
-        containerColor = Color.White      // 🔥 전체 화면 흰색
+        containerColor = Color.White
     ) { innerPadding ->
 
         val scrollState = rememberScrollState()
@@ -47,7 +63,7 @@ fun SkeletalAnalysisScreen(navController: NavController) {
             modifier = Modifier
                 .verticalScroll(scrollState)
                 .fillMaxSize()
-                .background(Color.White)  // 🔥 내부도 흰색
+                .background(Color.White)
                 .padding(innerPadding)
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -60,14 +76,45 @@ fun SkeletalAnalysisScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // 🔥 분석하기 버튼: 백엔드 /user/analyze-shape 호출
             Button(
-                onClick = { navController.navigate(Screen.AnalysisResult.route) },
-                enabled = selectedImageUri != null,
+                onClick = {
+                    val uri = selectedImageUri
+                    if (uri != null) {
+                        isLoading = true
+                        errorMessage = null
+
+                        viewModel.analyzeBodyShape(
+                            context = context,
+                            imageUri = uri
+                        ) { success, body ->
+                            isLoading = false
+                            if (success) {
+                                // TODO: body(JSON)를 파싱해서 결과 화면으로 넘기고 싶으면
+                                // viewModel에 저장한 뒤 결과 화면에서 다시 가져오게 하면 됨.
+                                navController.navigate(Screen.AnalysisResult.route)
+                            } else {
+                                errorMessage = body ?: "체형 분석 중 오류가 발생했습니다."
+                            }
+                        }
+                    }
+                },
+                enabled = selectedImageUri != null && !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
             ) {
-                Text("분석하기")
+                Text(if (isLoading) "분석 중..." else "분석하기")
+            }
+
+            // 에러 메시지 표시 (있을 때만)
+            if (errorMessage != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = errorMessage!!,
+                    color = Color.Red,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -80,7 +127,6 @@ fun SkeletalAnalysisScreen(navController: NavController) {
         }
     }
 }
-
 
 @Composable
 fun TopHeader(navController: NavController) {
@@ -112,7 +158,7 @@ fun TopHeader(navController: NavController) {
             modifier = Modifier.align(Alignment.Center)
         )
 
-        // ➕ 오른쪽 여백을 맞추는 목적 (필요하면)
+        // 오른쪽 여백 맞추기용
         Spacer(
             modifier = Modifier
                 .size(24.dp)
@@ -120,7 +166,6 @@ fun TopHeader(navController: NavController) {
         )
     }
 }
-
 
 @Composable
 fun PhotoUploadCard(imageUri: Uri?, onClick: () -> Unit) {
@@ -251,7 +296,7 @@ fun SkeletalTypeInfo() {
                 .height(260.dp)
         )
 
-        // 🔹 여성 체형 이름 4개 (모래시계 / 역삼각형 / 삼각형 / 직사각형)
+        // 여성 체형 이름 4개
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -288,7 +333,7 @@ fun SkeletalTypeInfo() {
                 .height(260.dp)
         )
 
-        // 🔹 남성 체형 이름 3개 (작은 역삼각형 / 사각형 / 큰 사각형)
+        // 남성 체형 이름 3개
         Row(
             modifier = Modifier
                 .fillMaxWidth()

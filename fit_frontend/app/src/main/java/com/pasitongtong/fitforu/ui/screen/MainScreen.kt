@@ -25,6 +25,7 @@ import com.pasitongtong.fitforu.viewmodel.MainViewModel
 import com.pasitongtong.fitforu.viewmodel.HomeViewModelFactory
 import com.pasitongtong.fitforu.viewmodel.SavedOutfitViewModel
 
+
 import com.pasitongtong.fitforu.ui.screen.BodyShapeInfo
 
 // ✅ Home 화면용 ViewModel / Factory (ui 패키지에 만든 파일 기준)
@@ -35,6 +36,7 @@ import com.pasitongtong.fitforu.ui.screen.BodyShapeInfo
  */
 @Composable
 fun MainScreen(mainViewModel: MainViewModel) {
+
 
     val navController = rememberNavController()
 
@@ -84,9 +86,14 @@ fun MainScreen(mainViewModel: MainViewModel) {
 
             composable(Screen.Home.route) {
                 val homeViewModel: HomeViewModel = viewModel(
-                    factory = HomeViewModelFactory("0449c5e0de9ca76dea138c059277b8a5")
+                    factory = HomeViewModelFactory(apiKey = "0449c5e0de9ca76dea138c059277b8a5")
                 )
-                HomeScreen(navController, homeViewModel)
+
+                HomeScreen(
+                    navController = navController,
+                    homeViewModel = homeViewModel,
+                    mainViewModel = mainViewModel   // ✅ 추가
+                )
             }
 
             composable(Screen.Closet.route) {
@@ -94,7 +101,9 @@ fun MainScreen(mainViewModel: MainViewModel) {
             }
 
             composable(Screen.AddClothes.route) {
-                AddClothesScreen(navController = navController)
+                AddClothesScreen(
+                    navController = navController,
+                    mainViewModel = mainViewModel)
             }
 
             composable(Screen.Stylebook.route) {
@@ -106,18 +115,21 @@ fun MainScreen(mainViewModel: MainViewModel) {
             }
 
             composable(Screen.SkeletalAnalysis.route) {
-                SkeletalAnalysisScreen(navController)
+                val mainViewModel: MainViewModel = viewModel()
+
+                SkeletalAnalysisScreen(
+                    navController = navController,
+                    viewModel = mainViewModel
+                )
             }
 
             // 🔥 분석 결과 화면 – 저장하기 누르면 homeViewModel 에 결과 저장
             composable(Screen.AnalysisResult.route) {
+                // 이미 MainScreen 함수의 파라미터로 mainViewModel 이 들어와 있으니까
+                // 새로 viewModel() 호출 안 하고 그대로 넘기면 됨
                 AnalysisResultScreen(
                     navController = navController,
-                    // TODO: 나중에 서버 라벨 연결. 지금은 임시로 "모래시계형"
-                    bodyShapeLabelFromServer = "모래시계형",
-                    onSaveResult = { info: BodyShapeInfo ->
-                        homeViewModel.saveBodyShape(info)   // ⬅ 아래 2번에서 구현
-                    }
+                    mainViewModel = mainViewModel
                 )
             }
 

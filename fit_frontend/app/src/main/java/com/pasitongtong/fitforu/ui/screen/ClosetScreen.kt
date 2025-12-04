@@ -40,6 +40,16 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Settings
 import com.pasitongtong.fitforu.ui.Screen
+import androidx.compose.runtime.collectAsState
+
+import coil.compose.AsyncImage
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.material3.Card
+import com.pasitongtong.fitforu.model.WardrobeItem
+import androidx.compose.ui.text.style.TextAlign
+
 
 
 // 카테고리 정보 (이모지로 아이콘 표현)
@@ -73,10 +83,13 @@ fun ClosetScreen(
     viewModel: MainViewModel
 ) {
     var selectedCategoryId by remember { mutableStateOf("ALL") }
-    val totalCount = 3
+    val closetUiState by viewModel.closetUiState.collectAsState()
+
+    // 🔥 1) 총 개수 = 서버에서 가져온 옷 개수
+    val totalCount = closetUiState.items.size
 
     Scaffold(
-        containerColor = Color.White,   // 🔥 전체 배경 흰색
+        containerColor = Color.White,
         topBar = {
             ClosetTopBar(
                 onBackClick = { navController.popBackStack() },
@@ -87,7 +100,7 @@ fun ClosetScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White)      // 🔥 내용 영역도 흰색
+                .background(Color.White)
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.Start
@@ -146,28 +159,95 @@ fun ClosetScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ------- 옷 리스트 들어가는 회색 영역 -------
+            // ------- 옷 리스트 영역 -------
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),   // 남은 높이 전부 사용
+                    .weight(1f),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFF3F4F7)   // ✅ 다시 연한 회색으로
+                    containerColor = Color(0xFFF3F4F7)
                 ),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ClosetItemCard(imageRes = R.drawable.closet1, modifier = Modifier.weight(1f))
-                    ClosetItemCard(imageRes = R.drawable.closet2, modifier = Modifier.weight(1f))
-                    ClosetItemCard(imageRes = R.drawable.closet3, modifier = Modifier.weight(1f))
+                val filteredItems = remember(selectedCategoryId, closetUiState.items) {
+                    when (selectedCategoryId) {
+                        "ALL" -> closetUiState.items
+                        "OUTER" -> closetUiState.items.filter { it.major_category == "아우터" }
+                        "TOP" -> closetUiState.items.filter { it.major_category == "상의" }
+                        "BOTTOM" -> closetUiState.items.filter { it.major_category == "하의" }
+                        "DRESS" -> closetUiState.items.filter { it.major_category == "원피스" }
+                        else -> closetUiState.items
+                    }
+                }
+
+
+                if (filteredItems.isEmpty()) {
+                    // 옷이 하나도 없을 때
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "아직 등록된 옷이 없어요.\n+ 버튼을 눌러 옷을 추가해보세요!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    // 🔥 3) 서버에서 받은 옷 리스트를 그리드로 표시
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(
+                            items = filteredItems,
+                            key = { it.id }
+                        ) { item ->
+                            ClosetNetworkItemCard(
+                                item = item,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
                 }
             }
+        }
+    }
+}
 
+@Composable
+fun ClosetNetworkItemCard(
+    item: WardrobeItem,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .aspectRatio(3f / 4f),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = item.image_url,
+                contentDescription = "${item.major_category} - ${item.minor_category}",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
         }
     }
 }

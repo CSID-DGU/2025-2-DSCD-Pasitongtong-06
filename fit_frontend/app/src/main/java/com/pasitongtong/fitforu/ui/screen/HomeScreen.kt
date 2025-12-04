@@ -20,13 +20,28 @@ import com.pasitongtong.fitforu.ui.Screen
 import com.pasitongtong.fitforu.viewmodel.HomeViewModel
 import androidx.compose.foundation.background
 
+import com.pasitongtong.fitforu.viewmodel.MainViewModel
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+
+import androidx.compose.runtime.collectAsState
+import com.pasitongtong.fitforu.ui.screen.getBodyShapeInfo
+import com.pasitongtong.fitforu.ui.screen.BodyShapeInfo
 @Composable
 fun HomeScreen(
     navController: NavController,
-    viewModel: HomeViewModel
+    homeViewModel: HomeViewModel,   // ✅ 이름 바꿈
+    mainViewModel: MainViewModel,
 ) {
-    val uiState by viewModel.state.collectAsState()
-    val bodyShapeInfo = viewModel.bodyShapeInfo   // 🔹 HomeViewModel 에 추가한 체형 결과
+    val uiState by homeViewModel.state.collectAsState()
+
+    // 🔥 MainViewModel 이 들고 있는 저장된 체형 라벨
+    val savedLabel by mainViewModel.savedBodyShapeLabel.collectAsState()
+
+    // 라벨이 있으면 BodyShapeInfo 로 변환, 없으면 null
+    val bodyShapeInfo = savedLabel?.let { label ->
+        getBodyShapeInfo(label)
+    }
 
     // 🔥 전체 화면 흰색 배경
     Box(
@@ -58,7 +73,7 @@ fun HomeScreen(
                 diffText = uiState.diffText,
                 loading = uiState.loading,
                 weatherEmoji = uiState.weatherIcon,
-                onRefreshClick = { viewModel.refresh() }
+                onRefreshClick = { homeViewModel.refresh() }  // ✅ 여기서도 이름 변경
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -85,7 +100,7 @@ fun HomeScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                IconButton(onClick = { viewModel.refresh() }) {
+                IconButton(onClick = { homeViewModel.refresh() }) {   // ✅ 여기도
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "다른 코디 보기"
@@ -103,6 +118,7 @@ fun HomeScreen(
         }
     }
 }
+
 
 
 @Composable
@@ -279,7 +295,7 @@ private fun BodyAnalysisResultCard(info: BodyShapeInfo) {
                 painter = painterResource(id = info.imageRes),
                 contentDescription = info.label,
                 modifier = Modifier
-                    .size(56.dp),
+                    .size(65.dp),
                 tint = Color.Unspecified        // 원본 색 유지
             )
 
