@@ -186,6 +186,7 @@ async def upload_clothes(
     file: UploadFile = File(...), 
     user_id: str = Depends(get_current_user_id)
 ):
+    # 1. 원본 이미지 임시 저장
     temp_filename = f"{uuid.uuid4()}_{file.filename}"
     temp_path = temp_filename 
 
@@ -193,35 +194,63 @@ async def upload_clothes(
         f.write(await file.read())
 
     try:
-        # 옷 분석 파이프라인 (이 결과값 item 딕셔너리에 fit, length 등이 들어있다고 가정)
+        # 2. 옷 분석 파이프라인 실행
         analyzed_items = process_clothes_image(temp_path) 
         saved_items = []
 
         if supabase:
             for item in analyzed_items:
-                # ... (이미지 스토리지 업로드 코드는 동일하게 유지) ...
+                # ==========================================================
+                # [추가된 부분] Supabase Storage 업로드 및 public_url 생성
+                # ==========================================================
                 
-                # [수정] DB에 저장할 데이터에 상세 속성 추가
+                # 분석된 개별 옷 이미지(crop된 이미지) 경로 가져오기
+                crop_path = item.get("crop_path")
+                
+                # 업로드할 파일명 생성 (유니크하게)
+                storage_filename = f"{user_id}/{uuid.uuid4()}.png"
+                
+                # 이미지 파일 읽어서 Supabase Storage에 업로드
+                if crop_path and os.path.exists(crop_path):
+                    with open(crop_path, "rb") as f:
+                        file_bytes = f.read()
+                        
+                    # "wardrobe_images" 버킷에 업로드 (버킷 이름이 다르다면 수정 필요)
+                    supabase.storage.from_("wardrobe_images").upload(
+                        path=storage_filename,
+                        file=file_bytes,
+                        file_options={"content-type": "image/png"}
+                    )
+                    
+                    # 업로드된 파일의 Public URL 가져오기
+                    public_url = supabase.storage.from_("wardrobe_images").get_public_url(storage_filename)
+                else:
+                    # 크롭 이미지가 없는 경우 예외 처리 (혹은 원본 사용 등 정책에 맞게 수정)
+                    print(f"Warning: Crop image not found for item {item}")
+                    continue 
+
+                # ==========================================================
+                
+                # DB에 저장할 데이터 구성
                 db_data = {
                     "user_id": user_id,
-                    "image_url": public_url,  # 위에서 생성한 public_url 사용
+                    "image_url": public_url,  # 이제 public_url이 정의되어 정상 작동합니다
                     "major_category": item.get("major"),
                     "minor_category": item.get("minor"),
                     "color": item.get("color"),
-                    # ▼▼▼ 상세 속성 추가 저장 ▼▼▼
                     "fit": item.get("fit"),
                     "length": item.get("length"),
                     "neckline": item.get("neckline"),
                     "collar": item.get("collar"),
-                    "prints": item.get("prints") # DB 컬럼 타입에 따라 json.dumps(item.get("prints")) 처리가 필요할 수 있음
+                    "prints": item.get("prints") 
                 }
                 
                 res = supabase.table("wardrobe").insert(db_data).execute()
                 saved_items.append(res.data[0] if res.data else {})
 
-                # 로컬 임시 파일 삭제
-                if os.path.exists(nobg_local_path): os.remove(nobg_local_path)
-                if os.path.exists(item["crop_path"]): os.remove(item["crop_path"])
+                # 개별 크롭 이미지 삭제 (선택 사항)
+                if crop_path and os.path.exists(crop_path):
+                    os.remove(crop_path)
 
         return JSONResponse(status_code=200, content={
             "ok": True,
@@ -230,8 +259,12 @@ async def upload_clothes(
         })
 
     except Exception as e:
+        # 에러 로그 출력
+        print(f"Error in upload_clothes: {e}")
         return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
+        
     finally:
+        # 원본 임시 파일 삭제
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
