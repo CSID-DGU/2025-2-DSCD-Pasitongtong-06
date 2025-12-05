@@ -254,6 +254,8 @@ async def upload_clothes(
                 res = supabase.table("wardrobe").insert(db_data).execute()
                 saved_items.append(res.data[0] if res.data else {})
 
+                crop_path = item.get("crop_path")
+
                 # 개별 크롭 이미지 삭제 (선택 사항)
                 if crop_path and os.path.exists(crop_path):
                     os.remove(crop_path)
