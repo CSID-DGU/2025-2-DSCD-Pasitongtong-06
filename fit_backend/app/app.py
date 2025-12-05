@@ -200,34 +200,40 @@ async def upload_clothes(
 
         if supabase:
             for item in analyzed_items:
-                # ==========================================================
-                # [추가된 부분] Supabase Storage 업로드 및 public_url 생성
-                # ==========================================================
+                # -----------------------------------------------------------
+                # [추가] 1. 처리된 이미지(배경 제거됨)를 Supabase Storage에 업로드
+                # -----------------------------------------------------------
+                # clothes_pipeline.py에서 배경 제거된 파일 경로를 'crop_nobg_path'로 반환합니다.
+                local_file_path = item.get("crop_nobg_path")
                 
-                # 분석된 개별 옷 이미지(crop된 이미지) 경로 가져오기
-                crop_path = item.get("crop_path")
-                
-                # 업로드할 파일명 생성 (유니크하게)
-                storage_filename = f"{user_id}/{uuid.uuid4()}.png"
-                
-                # 이미지 파일 읽어서 Supabase Storage에 업로드
-                if crop_path and os.path.exists(crop_path):
-                    with open(crop_path, "rb") as f:
-                        file_bytes = f.read()
-                        
-                    # "wardrobe_images" 버킷에 업로드 (버킷 이름이 다르다면 수정 필요)
+                # 만약 배경 제거된 파일이 없다면 원본('crop_path')을 사용하거나 에러 처리
+                if not local_file_path or not os.path.exists(local_file_path):
+                    print(f"[Warning] 파일이 존재하지 않음: {local_file_path}")
+                    continue
+
+                # 스토리지에 저장할 파일명 생성 (중복 방지 UUID 사용)
+                # 예: user_id/random_uuid.png 구조로 저장
+                file_ext = os.path.splitext(local_file_path)[1] # .png 등
+                storage_path = f"{user_id}/{uuid.uuid4()}{file_ext}"
+
+                with open(local_file_path, "rb") as f:
+                    file_bytes = f.read()
+
+                # 'wardrobe_images'라는 버킷이 Supabase에 미리 생성되어 있어야 합니다.
+                # 버킷 설정이 'Public'이어야 get_public_url이 작동합니다.
+                try:
                     supabase.storage.from_("wardrobe_images").upload(
-                        path=storage_filename,
+                        path=storage_path,
                         file=file_bytes,
                         file_options={"content-type": "image/png"}
                     )
                     
-                    # 업로드된 파일의 Public URL 가져오기
-                    public_url = supabase.storage.from_("wardrobe_images").get_public_url(storage_filename)
-                else:
-                    # 크롭 이미지가 없는 경우 예외 처리 (혹은 원본 사용 등 정책에 맞게 수정)
-                    print(f"Warning: Crop image not found for item {item}")
-                    continue 
+                    # 2. 업로드된 파일의 Public URL 가져오기
+                    public_url = supabase.storage.from_("wardrobe_images").get_public_url(storage_path)
+                    
+                except Exception as upload_err:
+                    print(f"[Error] Storage upload failed: {upload_err}")
+                    continue
 
                 # ==========================================================
                 
