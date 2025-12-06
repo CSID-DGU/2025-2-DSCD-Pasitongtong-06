@@ -511,7 +511,7 @@ def generate_outfit_comment(user_shape: str, outer, top, bottom, onepiece) -> st
         return completion.choices[0].message.content.strip()
     except Exception as e:
         print(f"[Error] LLM generation failed: {e}")
-        return "코디 설명을 생성하는 도중 오류가 발생했습니다."
+        return f"오류 발생: {str(e)}"  # 👈 앱 화면에서 구체적인 에러를 볼 수 있게 변경
 
 # ============================================================
 # 8. Main Entry Point (for App)
