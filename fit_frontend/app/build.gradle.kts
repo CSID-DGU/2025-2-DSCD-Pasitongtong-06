@@ -113,6 +113,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
+
+    implementation("io.coil-kt:coil-compose:2.7.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
 
     implementation("com.google.accompanist:accompanist-systemuicontroller:0.34.0")

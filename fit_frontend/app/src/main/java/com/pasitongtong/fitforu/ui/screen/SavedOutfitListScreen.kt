@@ -16,6 +16,8 @@ import androidx.navigation.NavController
 import com.pasitongtong.fitforu.viewmodel.OutfitViewModel
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.text.font.FontWeight
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 
 @Composable
 fun SavedOutfitListScreen(navController: NavController, outfitViewModel: OutfitViewModel) {
@@ -67,13 +69,14 @@ fun SavedOutfitListScreen(navController: NavController, outfitViewModel: OutfitV
                         colors = CardDefaults.cardColors(containerColor = Color(0xFFF9F9F9))
                     ) {
                         Column(Modifier.padding(16.dp)) {
-                            Image(
-                                painter = androidx.compose.ui.res.painterResource(id = item.imageRes),
-                                contentDescription = null,
+                            // 🔁 여기만 교체
+                            SavedOutfitCollage(
+                                outfit = item,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(260.dp)
                             )
+
                             Spacer(Modifier.height(12.dp))
                             Text(item.title, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(4.dp))

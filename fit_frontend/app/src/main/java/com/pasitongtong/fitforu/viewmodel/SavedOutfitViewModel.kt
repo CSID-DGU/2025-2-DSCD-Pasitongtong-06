@@ -22,15 +22,12 @@ class SavedOutfitViewModel : ViewModel() {
 
     /**
      * 코디 저장
-     * 이미 같은 코디가 있으면 중복 저장하지 않음
+     * 이미 같은 코디가 있으면(data class equals 기준) 중복 저장하지 않음
      */
     fun saveOutfit(outfit: SavedOutfit) {
         _savedOutfits.update { current ->
-            // 간단한 중복 체크 (imageRes + title 기준)
-            val exists = current.any {
-                it.imageRes == outfit.imageRes && it.title == outfit.title
-            }
-            if (exists) current else current + outfit
+            // ✅ SavedOutfit 이 data class 라서 equals/hashCode 자동 구현됨
+            if (current.contains(outfit)) current else current + outfit
         }
     }
 
@@ -39,9 +36,7 @@ class SavedOutfitViewModel : ViewModel() {
      */
     fun removeOutfit(outfit: SavedOutfit) {
         _savedOutfits.update { current ->
-            current.filterNot {
-                it.imageRes == outfit.imageRes && it.title == outfit.title
-            }
+            current - outfit   // equals 기준으로 같은 객체 제거
         }
     }
 
@@ -52,6 +47,6 @@ class SavedOutfitViewModel : ViewModel() {
         _savedOutfits.value = emptyList()
     }
 
-    // 🔜 Supabase 연동 예시 (나중에 구현)
-    // suspend fun syncWithRemote() { ... }
+    // 🔜 나중에 Supabase 연동 시 여기서 원격 저장/동기화 추가하면 됨
 }
+

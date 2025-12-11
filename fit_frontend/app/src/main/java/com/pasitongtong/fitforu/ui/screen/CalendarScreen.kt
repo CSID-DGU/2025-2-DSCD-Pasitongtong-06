@@ -27,27 +27,43 @@ import kotlin.math.ceil
 import androidx.compose.ui.layout.ContentScale
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
+import com.pasitongtong.fitforu.viewmodel.SavedOutfitViewModel
+import com.pasitongtong.fitforu.model.SavedOutfit
+import coil.compose.AsyncImage
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+
+
+
 data class OutfitThumbnail(
     val date: LocalDate,
     val imageResId: Int
 )
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
     navController: NavController,
-    outfits: List<OutfitThumbnail> = sampleOutfits(),
+    savedOutfitViewModel: SavedOutfitViewModel
 ) {
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
-    val outfitsByDate = remember(outfits) { outfits.groupBy { it.date } }
+
+    // ✅ 실제 저장된 코디 목록
+    val savedOutfits by savedOutfitViewModel.savedOutfits.collectAsState()
+
+    // 날짜별로 저장된 코디 그룹핑
+    val outfitsByDate = remember(savedOutfits) {
+        savedOutfits
+            .filter { it.date != null }              // 날짜 있는 것만
+            .groupBy { it.date!! }                  // Map<LocalDate, List<SavedOutfit>>
+    }
 
     val systemUiController = rememberSystemUiController()
 
     SideEffect {
         systemUiController.setStatusBarColor(
-            color = Color.White,          // ← 원하는 색
-            darkIcons = true              // 아이콘을 검정색으로 만들지 여부
+            color = Color.White,
+            darkIcons = true
         )
     }
 
@@ -57,28 +73,32 @@ fun CalendarScreen(
                 title = { Text("FitForU", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로가기")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "뒤로가기"
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.White,          // 배경 흰색
+                    containerColor = Color.White,
                     navigationIconContentColor = Color.Black,
                     titleContentColor = Color.Black
                 )
             )
         },
-        containerColor = Color.White   // ← ① 배경 흰색
+        containerColor = Color.White
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color.White)      // ← ② 전체 Column 흰색
+                .background(Color.White)
                 .padding(horizontal = 16.dp)
         ) {
 
             Spacer(modifier = Modifier.height(4.dp))
 
+            // ── 상단 월 표시 ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center
@@ -92,7 +112,7 @@ fun CalendarScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ─── 요일 헤더 ───
+            // ── 요일 헤더 ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -112,29 +132,159 @@ fun CalendarScreen(
                 }
             }
 
-            // ── 요일 아래 검은 라인
             Divider(
                 thickness = 0.6.dp,
                 color = Color.Black,
                 modifier = Modifier.padding(vertical = 6.dp)
             )
 
+            // ── 실제 달력 그리드 (여기서 outfitsByDate 를 넘김) ──
             CalendarMonthGrid(
                 month = currentMonth,
                 selectedDate = selectedDate,
-                outfitsByDate = outfitsByDate,
-                onDayClick = { selectedDate = it }
+                outfitsByDate = outfitsByDate,   // Map<LocalDate, List<SavedOutfit>>
+                onDayClick = { clicked ->
+                    selectedDate = clicked
+                }
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Text(
-                text = selectedDate?.let { "선택한 날: $it" } ?: "날짜를 선택해 주세요.",
-                style = MaterialTheme.typography.bodyMedium
-            )
+            // ── 선택된 날짜 + 해당 날짜 코디 목록 표시 ──
+            val todaysOutfits: List<SavedOutfit> =
+                selectedDate?.let { date -> outfitsByDate[date].orEmpty() } ?: emptyList()
+
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 🔽 캘린더 아래 나오는 코디 리스트 영역 (스크롤 가능하게)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)   // 남은 화면을 전부 이 영역에 배분
+            ) {
+                if (selectedDate == null) {
+                    // 날짜 안 골랐을 때
+                    Text(
+                        text = "날짜를 선택해 주세요.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray,
+                        modifier = Modifier.align(Alignment.TopStart)
+                    )
+                } else {
+                    val todaysOutfits: List<SavedOutfit> =
+                        outfitsByDate[selectedDate].orEmpty()
+
+                    if (todaysOutfits.isEmpty()) {
+                        Text(
+                            text = "이 날 저장한 코디가 없어요.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.Gray,
+                            modifier = Modifier.align(Alignment.TopStart)
+                        )
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            todaysOutfits.forEach { outfit ->
+                                CalendarOutfitCard(outfit = outfit)
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
+                    }
+                }
+            }
+
         }
     }
 }
+
+@Composable
+private fun CalendarOutfitCard(outfit: SavedOutfit) {
+
+    // 1) 체형 문구 제거 + 한글 치환 + Tip 줄바꿈
+    val formattedBody = remember(outfit.bodyText) {
+        outfit.bodyText
+            // 🔥🔥 ① 체형 설명 문장 삭제
+            .replace(Regex("사용자님은[^\\.]*\\."), "")  // 첫 문장 제거
+
+            // ② 체형 이름 한글 변환
+            .replace("Rectangle형", "직사각형")
+            .replace("invertedtriangle형", "역삼각형")
+            .replace("Triangle형", "삼각형")
+            .replace("Hourglass형", "모래시계형")
+            .replace("smallinvertedtriangle형", "작은 역삼각형")
+            .replace("square형", "사각형")
+            .replace("bigsquare형", "큰 사각형")
+
+            // ③ Tip 앞에 줄바꿈 넣기
+            .replace(" Tip:", "\n\nTip:")
+            .replace("TIP:", "\n\nTip:")
+            .replace("Tip.", "\n\nTip.")
+
+            // ④ 불필요한 공백 정리
+            .trimStart()
+    }
+
+    val formattedTip = remember(outfit.tip) {
+        outfit.tip
+            .replace("Rectangle형", "직사각형")
+            .replace("invertedtriangle형", "역삼각형")
+            .replace("Triangle형", "삼각형")
+            .replace("Hourglass형", "모래시계형")
+            .replace("smallinvertedtriangle형", "작은 역삼각형")
+            .replace("square형", "사각형")
+            .replace("bigsquare형", "큰 사각형")
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF4F5FA)),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+            // 콜라주
+            OutfitCollageCore(
+                topUrl = outfit.topImageUrl,
+                bottomUrl = outfit.bottomImageUrl,
+                outerUrl = outfit.outerImageUrl,
+                onepieceUrl = outfit.onepieceImageUrl,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ⭐ 체형 문구 제거된 본문 출력
+            if (formattedBody.isNotBlank()) {
+                Text(
+                    text = formattedBody,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            if (formattedTip.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Tip. $formattedTip",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+
 
 
 /**
@@ -142,10 +292,10 @@ fun CalendarScreen(
  * 각 날짜 아래에 해당 날짜의 코디 썸네일을 보여줌
  */
 @Composable
-private fun CalendarMonthGrid(
+fun CalendarMonthGrid(
     month: YearMonth,
     selectedDate: LocalDate?,
-    outfitsByDate: Map<LocalDate, List<OutfitThumbnail>>,
+    outfitsByDate: Map<LocalDate, List<SavedOutfit>>,
     onDayClick: (LocalDate) -> Unit
 ) {
     val firstDayOfMonth = month.atDay(1)
@@ -194,7 +344,7 @@ private fun CalendarMonthGrid(
 private fun CalendarDayCell(
     date: LocalDate,
     isSelected: Boolean,
-    outfits: List<OutfitThumbnail>,
+    outfits: List<SavedOutfit>,       // ✅ 이렇게
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -222,19 +372,22 @@ private fun CalendarDayCell(
             )
         }
 
-        // 썸네일 (최대 3개 정도만 표시)
-        Row(
-            modifier = Modifier
-                .padding(top = 2.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            outfits.take(3).forEach { outfit ->
-                Image(
-                    painter = painterResource(id = outfit.imageResId),
-                    contentDescription = "코디 썸네일",
+        // 🔽 이 부분이 예전에 imageResId 쓰던 자리일 거야
+        if (outfits.isNotEmpty()) {
+            val first = outfits.first()
+            val thumbUrl =
+                first.topImageUrl
+                    ?: first.onepieceImageUrl
+                    ?: first.outerImageUrl
+                    ?: first.bottomImageUrl
+
+            if (thumbUrl != null) {
+                AsyncImage(
+                    model = thumbUrl,
+                    contentDescription = null,
                     modifier = Modifier
                         .size(20.dp)
-                        .padding(horizontal = 1.dp),
+                        .clip(MaterialTheme.shapes.small),
                     contentScale = ContentScale.Crop
                 )
             }

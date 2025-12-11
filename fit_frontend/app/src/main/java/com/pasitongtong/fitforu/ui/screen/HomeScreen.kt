@@ -27,6 +27,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import com.pasitongtong.fitforu.ui.screen.getBodyShapeInfo
 import com.pasitongtong.fitforu.ui.screen.BodyShapeInfo
+import androidx.compose.runtime.LaunchedEffect
+import com.pasitongtong.fitforu.model.RecommendResult
+
+
 @Composable
 fun HomeScreen(
     navController: NavController,
@@ -38,9 +42,17 @@ fun HomeScreen(
     // 🔥 MainViewModel 이 들고 있는 저장된 체형 라벨
     val savedLabel by mainViewModel.savedBodyShapeLabel.collectAsState()
 
+    // 🔥 오늘 코디 추천 상태 (MainViewModel)
+    val outfitUiState by mainViewModel.outfitUiState.collectAsState()
     // 라벨이 있으면 BodyShapeInfo 로 변환, 없으면 null
+
     val bodyShapeInfo = savedLabel?.let { label ->
         getBodyShapeInfo(label)
+    }
+
+    // 홈 진입 시 오늘 코디 추천 한 번 로딩
+    LaunchedEffect(Unit) {
+        mainViewModel.loadOutfitRecommendations()
     }
 
     // 🔥 전체 화면 흰색 배경
@@ -112,9 +124,12 @@ fun HomeScreen(
 
             // ─── 오늘의 코디 회색 카드 ───
             OutfitResultCard(
-                loading = uiState.loading,
+                // 🔥 코디 데이터가 없고, 지금 로딩 중일 때만 true
+                loading = outfitUiState.isLoading && outfitUiState.data == null,
+                recommend = outfitUiState.data?.recommendations?.firstOrNull(),
                 onCardClick = { navController.navigate(Screen.OutfitDetail.route) }
             )
+
         }
     }
 }
@@ -324,6 +339,7 @@ private fun BodyAnalysisResultCard(info: BodyShapeInfo) {
 @Composable
 private fun OutfitResultCard(
     loading: Boolean,
+    recommend: RecommendResult?,   // 🔥 첫 번째 추천 코디
     onCardClick: () -> Unit
 ) {
     Card(
@@ -337,19 +353,60 @@ private fun OutfitResultCard(
         ),
         shape = MaterialTheme.shapes.large
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = if (loading)
-                    "체형 분석 결과와 날씨 정보를 불러오는 중입니다..."
-                else
-                    "체형 분석 결과를 반영한 코디 조합이에요.",
-                style = MaterialTheme.typography.bodyMedium,
-                fontSize = 14.sp
-            )
+        when {
+            loading -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "체형 분석 결과와 날씨 정보를 불러오는 중입니다...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+
+            recommend == null -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "오늘의 코디 정보를 불러오지 못했어요.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+
+            else -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // 👕 오늘 코디 콜라주 (LLM 텍스트 X)
+                    OutfitCollageCore(
+                        topUrl = recommend.top?.imageUrl,
+                        bottomUrl = recommend.bottom?.imageUrl,
+                        outerUrl = recommend.outer?.imageUrl,
+                        onepieceUrl = recommend.onepiece?.imageUrl,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(90.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "체형 분석 결과를 반영한 코디 조합이에요.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 14.sp
+                    )
+                }
+            }
         }
     }
 }
-

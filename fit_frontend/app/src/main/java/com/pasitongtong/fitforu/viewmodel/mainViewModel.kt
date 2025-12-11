@@ -16,6 +16,19 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
+import com.pasitongtong.fitforu.model.RecommendData
+import com.pasitongtong.fitforu.model.RecommendResult
+
+
+import kotlinx.coroutines.flow.update
+import io.ktor.client.call.body
+import io.ktor.client.request.post
+import io.ktor.http.contentType
+import com.pasitongtong.fitforu.model.RecommendResponse
+
+
+
+
 // ---------- Ktor(백엔드 호출용) ----------
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -41,6 +54,8 @@ import kotlinx.serialization.json.jsonPrimitive
 
 import com.pasitongtong.fitforu.model.WardrobeItem
 import com.pasitongtong.fitforu.viewmodel.AuthUiState.ClosetUiState
+
+import io.ktor.client.plugins.HttpTimeout
 
 import io.ktor.client.request.forms.*
 import io.ktor.http.*        // HttpHeaders
@@ -73,7 +88,21 @@ sealed interface AuthUiState {
 
 }
 
+data class OutfitRecommendUiState(
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val data: RecommendData? = null,
+    val currentIndex: Int = 0,
+) {
+    val current: RecommendResult?
+        get() = data?.recommendations?.getOrNull(currentIndex)
+}
+
 class MainViewModel : ViewModel() {
+
+    // ===== 코디 추천 상태 =====
+    private val _outfitUiState = MutableStateFlow(OutfitRecommendUiState())
+    val outfitUiState: StateFlow<OutfitRecommendUiState> = _outfitUiState
 
     // Supabase 클라이언트
     private val client = SupabaseProvider.client
@@ -83,6 +112,16 @@ class MainViewModel : ViewModel() {
 
     // 🔹 Ktor HTTP 클라이언트
     private val httpClient = HttpClient(OkHttp) {
+
+
+        // 1) 타임아웃 설정
+        install(HttpTimeout) {
+            requestTimeoutMillis = 5 * 60_000L   // 전체 요청 최대 5분
+            connectTimeoutMillis = 2 * 60_000L   // 서버 연결 최대 2분
+            socketTimeoutMillis  = 5 * 60_000L   // 응답 대기 최대 5분
+        }
+
+
         install(ContentNegotiation) {
             json(
                 Json {
@@ -528,6 +567,63 @@ class MainViewModel : ViewModel() {
             }
         }
     }
+
+    fun loadOutfitRecommendations() {
+        viewModelScope.launch {
+            try {
+                _outfitUiState.update { it.copy(isLoading = true) }
+
+                val session = client.auth.currentSessionOrNull()
+                    ?: error("세션 없음: 로그인 먼저 해주세요")
+
+                val accessToken = session.accessToken
+
+                // 🔥 인증 헤더 추가!
+                val httpResponse = httpClient.post("$backendBaseUrl/recommend/outfit") {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(emptyMap<String, String>())
+                }
+
+                val raw = httpResponse.bodyAsText()
+                Log.d("Recommend", "raw body = $raw")
+
+                val response: RecommendResponse = httpResponse.body()
+
+
+                _outfitUiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = null,
+                        data = response.data,
+                        currentIndex = 0
+                    )
+                }
+            } catch (e: Exception) {
+                _outfitUiState.update {
+                    it.copy(isLoading = false, error = e.message ?: "알 수 없는 오류")
+                }
+            }
+        }
+    }
+
+    fun showNextRecommendation() {
+        val state = _outfitUiState.value
+        val size = state.data?.recommendations?.size ?: return
+        if (size == 0) return
+
+        val next = (state.currentIndex + 1) % size
+        _outfitUiState.update { it.copy(currentIndex = next) }
+    }
+
+    fun confirmCurrentRecommendation() {
+        val current = _outfitUiState.value.current ?: return
+        // TODO: 선택된 코디를 Supabase에 저장하거나 코디북에 넣는 로직
+        Log.d("Outfit", "선택된 코디 score=${current.score}")
+    }
+
+
+
 
 
 

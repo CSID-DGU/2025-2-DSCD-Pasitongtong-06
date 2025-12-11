@@ -26,11 +26,15 @@ sealed class Screen(
     object AnalysisResult : Screen(route = "analysis_result")
     object Login : Screen(route = "login")
 
-    object OutfitDetail : Screen(
-        route = "outfit_detail",
-        title = "Best Clothes",
-        icon = null          // 하단 탭에는 안 쓸 거라 null
-    )
+    // ✅ date 를 쿼리 파라미터로 받는 라우트
+    object OutfitDetail : Screen("outfitDetail?date={date}") {
+
+        // 네비게이션할 때 쓸 헬퍼 함수
+        fun routeWithDate(date: String?): String {
+            // date가 null이면 빈 문자열로 보냄
+            return "outfitDetail?date=${date ?: ""}"
+        }
+    }
 
     // ✅ 저장된 코디 리스트 화면
     object SavedOutfitList : Screen(

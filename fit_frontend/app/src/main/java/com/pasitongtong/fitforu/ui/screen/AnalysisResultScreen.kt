@@ -35,6 +35,8 @@ data class BodyShapeInfo(
 /**
  *  백엔드 라벨(영어) + 한글 라벨 둘 다 처리
  */
+
+
 fun getBodyShapeInfo(rawLabel: String?): BodyShapeInfo {
 
     val key = (rawLabel ?: "")
