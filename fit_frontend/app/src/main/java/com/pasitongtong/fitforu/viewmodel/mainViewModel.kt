@@ -511,7 +511,7 @@ class MainViewModel : ViewModel() {
                     url = "$backendBaseUrl/clothes/upload",
                     formData = formData {
                         append(
-                            "file",
+                            "files",
                             imageBytes,
                             Headers.build {
                                 append(HttpHeaders.ContentType, "image/jpeg")

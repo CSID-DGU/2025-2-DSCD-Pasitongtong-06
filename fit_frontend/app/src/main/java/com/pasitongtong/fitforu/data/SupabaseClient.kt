@@ -38,7 +38,7 @@ val supabase = createSupabaseClient(
  *
  * 실제 배포 주소로 바꿔 넣어야 한다!
  */
-private const val BACKEND_BASE_URL = "https://YOUR_BACKEND_BASE_URL"   // TODO: 실제 주소로 교체
+private const val BACKEND_BASE_URL = "http://127.0.0.1:8000"   // TODO: 실제 주소로 교체
 
 // Ktor HttpClient (이미 data 패키지에 HttpClientProvider.kt 가 있다고 가정)
 private val httpClient get() = HttpClientProvider.client
